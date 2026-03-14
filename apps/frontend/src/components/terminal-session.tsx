@@ -222,7 +222,7 @@ export function TerminalSession({
   return (
     <div className={isActive ? "absolute inset-0" : "absolute inset-0 hidden"}>
       <div className="relative h-full w-full">
-        <div className="terminal-host" ref={containerRef} />
+        <div className="h-full w-full overflow-hidden [&_.xterm-viewport]:!overflow-y-auto [&_.xterm]:h-full [&_.xterm]:px-4 [&_.xterm]:py-3" ref={containerRef} />
         {showOverlay ? (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
             <div className="flex max-w-sm flex-col items-center gap-3 px-6 text-center">

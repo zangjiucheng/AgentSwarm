@@ -1,4 +1,4 @@
-import { Button, Spinner, Tooltip } from "@heroui/react"
+import { Button, Spinner } from "@heroui/react"
 import { IconCode, IconTerminal2, IconTrash } from "@tabler/icons-react"
 import { useAtom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
@@ -10,9 +10,11 @@ import { getWorkerIframeUrl } from "../lib/worker-urls"
 const DEFAULT_TERMINAL_HEIGHT = 320
 const terminalHeightAtom = atomWithStorage("terminal-height", DEFAULT_TERMINAL_HEIGHT)
 
+type WorkerWorkspaceState = "active" | "cached" | "unloaded"
+
 type WorkerWorkspaceProps = {
-  isActive: boolean
   onDestroyWorker: () => void
+  state: WorkerWorkspaceState
   workerPort: number
 }
 
@@ -48,8 +50,8 @@ const terminalIcons: Record<TerminalName, typeof IconCode> = {
 }
 
 export function WorkerWorkspace({
-  isActive,
   onDestroyWorker,
+  state,
   workerPort,
 }: WorkerWorkspaceProps) {
   const shellRef = useRef<HTMLDivElement | null>(null)
@@ -107,13 +109,17 @@ export function WorkerWorkspace({
     window.addEventListener("mouseup", stopResize)
   }
 
-  const hiddenClass = isActive
+  if (state === "unloaded") {
+    return null
+  }
+
+  const hiddenClass = state === "active"
     ? "pointer-events-auto opacity-100"
     : "pointer-events-none opacity-0"
 
   return (
     <section
-      className={`absolute inset-0 flex flex-col transition-opacity duration-200 ${hiddenClass}`}
+      className={`absolute inset-0 flex flex-col ${hiddenClass}`}
       ref={shellRef}
     >
       {iframeUrl ? (
@@ -186,39 +192,36 @@ export function WorkerWorkspace({
                   const Icon = terminalIcons[session.value]
 
                   return (
-                    <Tooltip content={session.label} key={session.value} placement="right">
-                      <Button
-                        className={isSelected ? "text-primary" : "text-default-500"}
-                        color={isSelected ? "secondary" : "default"}
-                        isIconOnly
-                        onPress={() => setActiveTerminal(session.value)}
-                        size="sm"
-                        variant="light"
-                      >
-                        <Icon size={18} />
-                      </Button>
-                    </Tooltip>
+                    <Button
+                      className={isSelected ? "text-primary" : "text-default-500"}
+                      color={isSelected ? "secondary" : "default"}
+                      isIconOnly
+                      key={session.value}
+                      onPress={() => setActiveTerminal(session.value)}
+                      size="sm"
+                      variant="light"
+                    >
+                      <Icon size={18} />
+                    </Button>
                   )
                 })}
               </div>
-              <Tooltip content="Destroy worker" placement="right">
-                <Button
-                  className="text-default-500"
-                  color="danger"
-                  isIconOnly
-                  onPress={onDestroyWorker}
-                  size="sm"
-                  variant="light"
-                >
-                  <IconTrash size={18} />
-                </Button>
-              </Tooltip>
+              <Button
+                className="text-default-500"
+                color="danger"
+                isIconOnly
+                onPress={onDestroyWorker}
+                size="sm"
+                variant="light"
+              >
+                <IconTrash size={18} />
+              </Button>
             </div>
             <div className="relative min-w-0 flex-1">
               {terminalSessions.map((session) => (
                 <TerminalSession
                   command={session.command}
-                  isActive={isActive && activeTerminal === session.value}
+                  isActive={activeTerminal === session.value}
                   key={session.value}
                   port={workerPort}
                   title={session.label}

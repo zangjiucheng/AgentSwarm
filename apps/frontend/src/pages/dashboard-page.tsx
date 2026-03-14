@@ -1,14 +1,10 @@
-import { Button, Divider, Tooltip } from "@heroui/react"
-import { useEffect, useState } from "react"
+import { Button, Divider } from "@heroui/react"
+import { useEffect, useRef, useState } from "react"
+import { useNavigate, useParams } from "react-router"
 import { AddWorkerModal } from "../components/add-worker-modal"
 import { WorkerSidebar } from "../components/worker-sidebar"
 import { WorkerWorkspace } from "../components/worker-workspace"
 import type { PresetInfo, WorkerInfo } from "../lib/api-types"
-import {
-  clearSelectedWorkerPort,
-  readSelectedWorkerPort,
-  writeSelectedWorkerPort,
-} from "../lib/storage"
 import { trpc } from "../trpc"
 
 const MAX_CACHED_WORKSPACES = 3
@@ -17,6 +13,10 @@ const EMPTY_PRESETS: PresetInfo[] = []
 
 export function DashboardPage() {
   const utils = trpc.useUtils()
+  const navigate = useNavigate()
+  const { port: portParam } = useParams<{ port: string }>()
+  const activePort = portParam ? Number(portParam) : undefined
+
   const workersQuery = trpc.workers.useQuery(undefined, {
     refetchInterval: 1_000,
     refetchOnWindowFocus: false,
@@ -26,32 +26,35 @@ export function DashboardPage() {
     staleTime: Number.POSITIVE_INFINITY,
   })
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [preferredPort, setPreferredPort] = useState<number | undefined>(() =>
-    readSelectedWorkerPort(),
-  )
-  const [visitedPorts, setVisitedPorts] = useState<number[]>([])
+  const recentPortsRef = useRef<number[]>([])
 
   const workers = workersQuery.data ?? EMPTY_WORKERS
   const presets = presetsQuery.data ?? EMPTY_PRESETS
-  const selectedWorker =
-    workers.find((worker) => worker.port === preferredPort) ?? workers[0]
-  const selectedPort = selectedWorker?.port
 
-  const rememberPort = (port: number) => {
-    setPreferredPort(port)
-    setVisitedPorts((currentPorts) =>
-      [port, ...currentPorts.filter((currentPort) => currentPort !== port)].slice(
-        0,
-        MAX_CACHED_WORKSPACES,
-      ),
-    )
+  // Track visited ports for caching
+  useEffect(() => {
+    if (activePort === undefined) return
+    recentPortsRef.current = [
+      activePort,
+      ...recentPortsRef.current.filter((p) => p !== activePort),
+    ].slice(0, MAX_CACHED_WORKSPACES)
+  }, [activePort])
+
+  const availablePorts = new Set(workers.map((w) => w.port))
+
+  const cachedPorts = recentPortsRef.current.filter((p) => availablePorts.has(p))
+
+  const getWorkerState = (port: number): "active" | "cached" | "unloaded" => {
+    if (port === activePort) return "active"
+    if (cachedPorts.includes(port)) return "cached"
+    return "unloaded"
   }
 
   const startWorker = trpc.startWorker.useMutation({
     onSuccess: async ({ port }) => {
       setIsAddModalOpen(false)
       await utils.workers.invalidate()
-      rememberPort(port)
+      navigate(`/${port}`)
     },
   })
 
@@ -61,33 +64,6 @@ export function DashboardPage() {
     },
   })
 
-  useEffect(() => {
-    if (selectedPort === undefined) {
-      clearSelectedWorkerPort()
-      return
-    }
-
-    writeSelectedWorkerPort(selectedPort)
-  }, [selectedPort])
-
-  const cachedWorkers = (() => {
-    const availablePorts = new Set(workers.map((worker) => worker.port))
-    const candidatePorts =
-      selectedPort === undefined ? visitedPorts : [selectedPort, ...visitedPorts]
-    const uniquePorts = [...new Set(candidatePorts)].filter((port) =>
-      availablePorts.has(port),
-    )
-
-    return uniquePorts
-      .slice(0, MAX_CACHED_WORKSPACES)
-      .map((port) => workers.find((worker) => worker.port === port))
-      .filter((worker): worker is WorkerInfo => worker !== undefined)
-  })()
-
-  const addWorkerError =
-    startWorker.error?.message ??
-    (presetsQuery.isError ? presetsQuery.error.message : undefined)
-
   const handleDestroyWorker = (worker: WorkerInfo) => {
     const confirmed = window.confirm(`Destroy "${worker.title}" on port ${worker.port}?`)
 
@@ -95,39 +71,39 @@ export function DashboardPage() {
       return
     }
 
-    setVisitedPorts((currentPorts) =>
-      currentPorts.filter((port) => port !== worker.port),
-    )
+    recentPortsRef.current = recentPortsRef.current.filter((p) => p !== worker.port)
     destroyWorker.mutate({ port: worker.port })
+
+    if (activePort === worker.port) {
+      navigate("/")
+    }
   }
 
+  const addWorkerError =
+    startWorker.error?.message ??
+    (presetsQuery.isError ? presetsQuery.error.message : undefined)
 
   return (
     <>
-      <div className="app-grid flex min-h-screen bg-background text-foreground">
+      <div className="flex min-h-screen bg-background text-foreground">
         <WorkerSidebar
-          destroyPendingPort={destroyWorker.variables?.port}
           isLoading={workersQuery.isLoading}
           onCreateWorker={() => {
             startWorker.reset()
             setIsAddModalOpen(true)
           }}
-          onDestroyWorker={handleDestroyWorker}
-          onRefresh={() => void workersQuery.refetch()}
-          onSelectWorker={rememberPort}
-          selectedPort={selectedPort}
           workers={workers}
         />
         <Divider orientation="vertical" />
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <div className="relative min-h-0 flex-1 overflow-hidden">
-            {selectedWorker ? (
-              cachedWorkers.map((worker) => (
+            {activePort && availablePorts.has(activePort) ? (
+              workers.map((worker) => (
                 <WorkerWorkspace
-                  isActive={worker.port === selectedWorker.port}
                   key={worker.port}
                   onDestroyWorker={() => handleDestroyWorker(worker)}
+                  state={getWorkerState(worker.port)}
                   workerPort={worker.port}
                 />
               ))
