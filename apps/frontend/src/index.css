@@ -1,8 +1,8 @@
 @import "tailwindcss";
+@import "xterm/css/xterm.css";
 
 :root {
-  color: #e2e8f0;
-  background: #020617;
+  color-scheme: dark;
   font-family:
     Inter,
     ui-sans-serif,
@@ -13,10 +13,55 @@
     sans-serif;
 }
 
+html,
 body {
   margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top, rgba(120, 40, 200, 0.18), transparent 35%),
+    linear-gradient(180deg, #09090f 0%, #06060b 55%, #030308 100%);
+  color: #f5f3ff;
 }
 
 * {
   box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-grid {
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-position: center;
+  background-size: 32px 32px;
+}
+
+.terminal-host {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.terminal-host .xterm {
+  height: 100%;
+  padding: 12px 16px;
+}
+
+.terminal-host .xterm-viewport {
+  overflow-y: auto !important;
 }
