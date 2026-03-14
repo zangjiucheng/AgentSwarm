@@ -3,6 +3,7 @@ import { z } from "zod"
 import { destroyWorkerContainer } from "./destroy-worker"
 import { listWorkers } from "./list-workers"
 import { startWorkerContainer } from "./start-worker"
+import { config } from "./config"
 
 const t = initTRPC.create()
 
@@ -34,6 +35,14 @@ const workerSchema = z.object({
     .optional(),
 })
 
+const presetsSchema = z.array(
+  z.object({
+    name: z.string(),
+    imageTag: z.string(),
+    requiredEnv: z.array(z.string()),
+  }),
+)
+
 export const appRouter = router({
   health: publicProcedure
     .output(
@@ -46,6 +55,9 @@ export const appRouter = router({
         ok: true as const,
       }
     }),
+  presets: publicProcedure.output(presetsSchema).query(() => {
+    return config.presets
+  }),
   workers: publicProcedure.output(z.array(workerSchema)).query(async () => {
     return listWorkers()
   }),
@@ -66,9 +78,7 @@ export const appRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to destroy worker",
+            error instanceof Error ? error.message : "Failed to destroy worker",
           cause: error,
         })
       }
