@@ -1,23 +1,11 @@
 import { initTRPC } from "@trpc/server"
 import { z } from "zod"
+import { getMonitorStatus, monitorInfoSchema } from "./monitor"
 
 const t = initTRPC.create()
 
 export const router = t.router
 export const publicProcedure = t.procedure
-
-const statusSchema = z.object({
-  status: z.enum(["working", "idle", "waiting"]),
-  pr: z
-    .object({
-      name: z.string(),
-      number: z.string(),
-      link: z.string(),
-      branch: z.string(),
-      baseBranch: z.string(),
-    })
-    .optional(),
-})
 
 export const appRouter = router({
   health: publicProcedure
@@ -31,11 +19,7 @@ export const appRouter = router({
         ok: true as const,
       }
     }),
-  status: publicProcedure.output(statusSchema).query(() => {
-    return {
-      status: "idle",
-    }
-  }),
+  status: publicProcedure.output(monitorInfoSchema).query(() => getMonitorStatus()),
 })
 
 export type AppRouter = typeof appRouter
