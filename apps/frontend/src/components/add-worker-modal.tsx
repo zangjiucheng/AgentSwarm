@@ -1,6 +1,5 @@
 import {
   Button,
-  Divider,
   Input,
   Modal,
   ModalBody,
@@ -9,8 +8,9 @@ import {
   ModalHeader,
   Select,
   SelectItem,
+  Textarea,
 } from "@heroui/react"
-import { useMemo, useState, type Key } from "react"
+import { Fragment, useMemo, useState, type Key } from "react"
 import { useNavigate } from "react-router"
 import type { PresetInfo } from "../lib/api-types"
 import { trpc } from "../trpc"
@@ -37,7 +37,7 @@ export function AddWorkerModal({
     onSuccess: async ({ port }) => {
       onOpenChange(false)
       await utils.workers.invalidate()
-      navigate(`/${port}`)
+      void navigate(`/${port}`)
     },
   })
 
@@ -48,11 +48,7 @@ export function AddWorkerModal({
   )
 
   const missingRequiredField =
-    title.trim().length === 0 ||
-    (selectedPreset?.requiredEnv.some(
-      (key) => (envValues[key] ?? "").trim().length === 0,
-    ) ??
-      true)
+    title.trim().length === 0 || selectedPreset == null
 
   const errorMessage = startWorker.error?.message
 
@@ -73,39 +69,23 @@ export function AddWorkerModal({
       isOpen={isOpen}
       onOpenChange={handleOpenChange}
       placement="top-center"
-      size="2xl"
+      size="xl"
     >
       <ModalContent>
         {(close) => (
           <>
-            <ModalHeader className="flex flex-col gap-1 pb-3">
-              <p className="text-default-500 text-xs tracking-[0.24em] uppercase">
-                Start worker
-              </p>
-              <p className="text-foreground text-2xl font-semibold">
-                Create a new worker from a preset
-              </p>
-            </ModalHeader>
-            <Divider />
-            <ModalBody className="gap-5 py-5">
+            <ModalHeader>New Worker</ModalHeader>
+            <ModalBody className="gap-5">
               <Input
                 autoFocus
-                classNames={{
-                  inputWrapper:
-                    "bg-transparent shadow-none ring-1 ring-white/10 data-[hover=true]:bg-transparent",
-                }}
                 isRequired
-                label="Worker title"
+                label="Title"
                 onValueChange={setTitle}
                 placeholder="Frontend QA, bug triage, release check..."
                 value={title}
               />
               <Select
-                classNames={{
-                  trigger:
-                    "bg-transparent shadow-none ring-1 ring-white/10 data-[hover=true]:bg-transparent",
-                }}
-                disallowEmptySelection
+                isRequired
                 label="Preset"
                 onSelectionChange={(keys) => {
                   const nextKey =
@@ -131,36 +111,24 @@ export function AddWorkerModal({
               ) : null}
 
               {selectedPreset ? (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <p className="text-default-500 text-xs tracking-[0.22em] uppercase">
-                      Required environment
-                    </p>
-                    <p className="text-default-400 text-sm">
-                      These fields come directly from the selected preset.
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {selectedPreset.requiredEnv.map((envKey) => (
-                      <Input
-                        classNames={{
-                          inputWrapper:
-                            "bg-transparent shadow-none ring-1 ring-white/10 data-[hover=true]:bg-transparent",
-                        }}
-                        isRequired
-                        key={envKey}
-                        label={envKey}
+                <div className="grid grid-cols-[auto_1fr] items-start gap-x-4 gap-y-4">
+                  {selectedPreset.requiredEnv.map((envKey) => (
+                    <Fragment key={envKey}>
+                      <label className="text-foreground self-center font-mono text-sm">
+                        {envKey}
+                      </label>
+                      <Textarea
                         onValueChange={(value) =>
                           setEnvValues((currentValues) => ({
                             ...currentValues,
                             [envKey]: value,
                           }))
                         }
-                        type={"text"}
                         value={envValues[envKey] ?? ""}
+                        minRows={1}
                       />
-                    ))}
-                  </div>
+                    </Fragment>
+                  ))}
                 </div>
               ) : null}
 
@@ -168,13 +136,12 @@ export function AddWorkerModal({
                 <p className="text-danger text-sm">{errorMessage}</p>
               ) : null}
             </ModalBody>
-            <Divider />
             <ModalFooter className="pt-3">
               <Button onPress={close} variant="light">
                 Cancel
               </Button>
               <Button
-                color="secondary"
+                color="primary"
                 isDisabled={missingRequiredField}
                 isLoading={startWorker.isPending}
                 onPress={() => {
@@ -183,7 +150,12 @@ export function AddWorkerModal({
                   }
 
                   startWorker.mutate({
-                    env: envValues,
+                    env: Object.fromEntries(
+                      selectedPreset.requiredEnv.map((key) => [
+                        key,
+                        envValues[key] ?? "",
+                      ]),
+                    ),
                     preset: selectedPreset.name,
                     title: title.trim(),
                   })

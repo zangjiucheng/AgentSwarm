@@ -18,8 +18,8 @@ function WorkerItem({ worker }: { worker: WorkerInfo }) {
   return (
     <Button
       as={Link}
-      className={`relative h-auto w-full flex-col justify-start rounded-none px-4 py-3 text-left ${
-        isActive ? "text-foreground bg-gray-700" : "text-default-500"
+      className={`relative h-auto w-full flex-col items-start rounded-none px-4 py-3 text-left gap-0 ${
+        isActive ? "bg-gray-700" : ""
       }`}
       to={`/${worker.port}`}
       variant="light"
@@ -32,9 +32,9 @@ function WorkerItem({ worker }: { worker: WorkerInfo }) {
         <span
           className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${statusTone(worker.status)}`}
         />
-        <span className="ml-1.5 text-gray-300">{worker.preset}</span>
+        <span className="ml-2 text-gray-300">{worker.preset}</span>
       </p>
-      <p className="mt-1">{worker.title}</p>
+      <p className="mt-2 text-base text-wrap">{worker.title}</p>
       {worker.pr ? (
         <a
           className="mt-1"
