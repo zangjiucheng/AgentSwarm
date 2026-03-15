@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@heroui/react": "^2.8.10",
+    "@heroui/theme": "^2.4.26",
     "@repo/backend": "workspace:*",
     "@tabler/icons-react": "^3.40.0",
     "@tanstack/react-query": "^5.90.21",
