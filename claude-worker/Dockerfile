@@ -47,6 +47,13 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 COPY --chown=kasm-user:kasm-user dot_claude /home/kasm-user/.claude
 COPY --chown=kasm-user:kasm-user claude.json /home/kasm-user/.claude.json
 
+# OpenAI Codex
+RUN cd /home/kasm-user/.local/bin && \
+    wget https://github.com/openai/codex/releases/latest/download/codex-x86_64-unknown-linux-musl.tar.gz && \
+    tar -xzf codex-x86_64-unknown-linux-musl.tar.gz && \
+    rm codex-x86_64-unknown-linux-musl.tar.gz && \
+    mv codex-x86_64-unknown-linux-musl codex
+
 # Monitor Daemon
 COPY monitor /opt/monitor/bin/monitor
 COPY nginx-monitor.conf /etc/nginx/conf.d/monitor.conf

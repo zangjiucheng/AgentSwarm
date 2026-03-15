@@ -11,3 +11,4 @@ bun run build
 cd "$ROOT_DIR"
 cp "$ROOT_DIR/../apps/monitor/dist/monitor" "$ROOT_DIR/monitor"
 docker build -t pegasis0/claude-worker:latest .
+docker push pegasis0/claude-worker:latest

@@ -186,7 +186,7 @@ export function WorkerWorkspace({
         ref={shellRef}
       >
         <iframe
-          allow="clipboard-read; clipboard-write"
+          allow="autoplay; microphone; clipboard-read; clipboard-write; self"
           className="h-full w-full border-0 bg-[#282828]"
           src={getWorkerIframeUrl(workerPort)}
         />
@@ -241,7 +241,7 @@ export function WorkerWorkspace({
             {terminalSessions.map((session) => (
               <TerminalSession
                 command={session.command}
-                isActive={activeTerminal === session.value}
+                isActive={activeTerminal === session.value && state === "active"}
                 key={session.value}
                 port={workerPort}
                 title={session.label}
