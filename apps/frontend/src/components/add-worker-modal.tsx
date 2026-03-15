@@ -8,6 +8,7 @@ import {
   ModalHeader,
   Select,
   SelectItem,
+  Snippet,
   Textarea,
 } from "@heroui/react"
 import { Fragment, useMemo, useState, type Key } from "react"
@@ -51,6 +52,24 @@ export function AddWorkerModal({
     title.trim().length === 0 || selectedPreset == null
 
   const errorMessage = startWorker.error?.message
+
+  const curlCommand = useMemo(() => {
+    if (!selectedPreset) return null
+
+    const input = {
+      title: title.trim(),
+      preset: selectedPreset.name,
+      env: Object.fromEntries(
+        selectedPreset.requiredEnv.map((key) => [
+          key,
+          envValues[key] ?? "",
+        ]),
+      ),
+    }
+
+    const origin = window.location.origin
+    return `curl -X POST '${origin}/api/trpc/startWorker' \\\n  -H 'content-type: application/json' \\\n  -d '${JSON.stringify(input)}'`
+  }, [title, selectedPreset, envValues])
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -134,6 +153,19 @@ export function AddWorkerModal({
 
               {errorMessage ? (
                 <p className="text-danger text-sm">{errorMessage}</p>
+              ) : null}
+
+              {curlCommand ? (
+                <Snippet
+                  classNames={{
+                    base: "bg-default-100 items-start",
+                    pre: "whitespace-pre-wrap break-all font-mono text-xs",
+                  }}
+                  symbol=""
+                  variant="flat"
+                >
+                  {curlCommand}
+                </Snippet>
               ) : null}
             </ModalBody>
             <ModalFooter className="pt-3">

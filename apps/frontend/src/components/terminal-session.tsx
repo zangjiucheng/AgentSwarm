@@ -1,6 +1,6 @@
 import { XTerm } from "@pablo-lion/xterm-react"
 import { FitAddon } from "@xterm/addon-fit"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { getWorkerTerminalUrl } from "../lib/worker-urls"
 
 type TerminalSessionProps = {
@@ -57,7 +57,6 @@ export function TerminalSession({
   const xtermRef = useRef<InstanceType<typeof XTerm> | null>(null)
   const fitAddon = useMemo(() => new FitAddon(), [])
   const socketRef = useRef<WebSocket | null>(null)
-  const isActiveRef = useRef(isActive)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   const safeFit = useCallback(() => {
@@ -72,10 +71,6 @@ export function TerminalSession({
     () => getWorkerTerminalUrl(port, command),
     [command, port],
   )
-
-  useLayoutEffect(() => {
-    isActiveRef.current = isActive
-  }, [isActive])
 
   useEffect(() => {
     const socket = new WebSocket(terminalUrl)
@@ -109,14 +104,14 @@ export function TerminalSession({
           )
         }
       } catch {
-        xtermRef.current?.writeln("\r\n\u001b[31m[invalid terminal message]\u001b[0m")
+        xtermRef.current?.writeln(
+          "\r\n\u001b[31m[invalid terminal message]\u001b[0m",
+        )
       }
     })
 
     const resizeObserver = new ResizeObserver(() => {
-      if (isActiveRef.current) {
-        sendResize()
-      }
+      sendResize()
     })
 
     if (containerRef.current) {
@@ -125,7 +120,7 @@ export function TerminalSession({
 
     requestAnimationFrame(() => {
       safeFit()
-      if (isActiveRef.current) sendResize()
+      sendResize()
     })
 
     return () => {
@@ -136,8 +131,6 @@ export function TerminalSession({
   }, [terminalUrl, fitAddon, safeFit])
 
   useEffect(() => {
-    if (!isActive) return
-
     requestAnimationFrame(() => {
       safeFit()
       xtermRef.current?.focus()
@@ -150,7 +143,7 @@ export function TerminalSession({
       const { cols, rows } = xterm.terminal
       socket.send(JSON.stringify({ cols, rows, type: "resize" }))
     })
-  }, [isActive, safeFit])
+  }, [safeFit])
 
   const handleData = (data: string) => {
     const socket = socketRef.current
