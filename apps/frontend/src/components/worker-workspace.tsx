@@ -186,7 +186,8 @@ export function WorkerWorkspace({
         ref={shellRef}
       >
         <iframe
-          allow="autoplay; microphone; clipboard-read; clipboard-write; self"
+          allow="autoplay; microphone; clipboard-read; clipboard-write; fullscreen; self"
+          allowFullScreen
           className="h-full w-full border-0 bg-[#282828]"
           src={getWorkerIframeUrl(workerPort)}
         />
