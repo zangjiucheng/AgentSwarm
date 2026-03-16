@@ -11,7 +11,7 @@ import {
   Snippet,
   Textarea,
 } from "@heroui/react"
-import { Fragment, useMemo, useState, type Key } from "react"
+import { Fragment, useEffect, useMemo, useState, type Key } from "react"
 import { useNavigate } from "react-router"
 import type { PresetInfo } from "../lib/api-types"
 import { trpc } from "../trpc"
@@ -33,6 +33,7 @@ export function AddWorkerModal({
   const [title, setTitle] = useState("")
   const [presetName, setPresetName] = useState("")
   const [envValues, setEnvValues] = useState<Record<string, string>>({})
+  const [showLongLoadHint, setShowLongLoadHint] = useState(false)
 
   const startWorker = trpc.startWorker.useMutation({
     onSuccess: async ({ port }) => {
@@ -40,7 +41,14 @@ export function AddWorkerModal({
       await utils.workers.invalidate()
       void navigate(`/${port}`)
     },
+    onSettled: () => setShowLongLoadHint(false),
   })
+
+  useEffect(() => {
+    if (!startWorker.isPending) return
+    const timer = setTimeout(() => setShowLongLoadHint(true), 20_000)
+    return () => clearTimeout(timer)
+  }, [startWorker.isPending])
 
   const effectivePresetName = presetName || presets[0]?.name || ""
   const selectedPreset = useMemo(
@@ -60,10 +68,7 @@ export function AddWorkerModal({
       title: title.trim(),
       preset: selectedPreset.name,
       env: Object.fromEntries(
-        selectedPreset.requiredEnv.map((key) => [
-          key,
-          envValues[key] ?? "",
-        ]),
+        selectedPreset.requiredEnv.map((key) => [key, envValues[key] ?? ""]),
       ),
     }
 
@@ -76,6 +81,7 @@ export function AddWorkerModal({
       setTitle("")
       setPresetName("")
       setEnvValues({})
+      setShowLongLoadHint(false)
       startWorker.reset()
     }
 
@@ -167,34 +173,42 @@ export function AddWorkerModal({
                 </Snippet>
               ) : null}
             </ModalBody>
-            <ModalFooter className="pt-3">
-              <Button onPress={close} variant="light">
-                Cancel
-              </Button>
-              <Button
-                color="primary"
-                isDisabled={missingRequiredField}
-                isLoading={startWorker.isPending}
-                onPress={() => {
-                  if (!selectedPreset) {
-                    return
-                  }
+            <ModalFooter className="flex-col items-stretch gap-2 pt-3">
+              <div className="flex w-full justify-end gap-2">
+                <Button onPress={close} variant="light">
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  isDisabled={missingRequiredField}
+                  isLoading={startWorker.isPending}
+                  onPress={() => {
+                    if (!selectedPreset) {
+                      return
+                    }
 
-                  startWorker.mutate({
-                    env: Object.fromEntries(
-                      selectedPreset.requiredEnv.map((key) => [
-                        key,
-                        envValues[key] ?? "",
-                      ]),
-                    ),
-                    preset: selectedPreset.name,
-                    title: title.trim(),
-                  })
-                }}
-                variant="flat"
-              >
-                Start worker
-              </Button>
+                    startWorker.mutate({
+                      env: Object.fromEntries(
+                        selectedPreset.requiredEnv.map((key) => [
+                          key,
+                          envValues[key] ?? "",
+                        ]),
+                      ),
+                      preset: selectedPreset.name,
+                      title: title.trim(),
+                    })
+                  }}
+                  variant="flat"
+                >
+                  Start worker
+                </Button>
+              </div>
+              {showLongLoadHint ? (
+                <p className="text-default-400 text-center text-xs">
+                  Creating a worker for the first time may take a long time due
+                  to pulling images.
+                </p>
+              ) : null}
             </ModalFooter>
           </>
         )}
