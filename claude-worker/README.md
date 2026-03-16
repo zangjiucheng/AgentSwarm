@@ -57,7 +57,7 @@ For end-user customization, the most important hook is `~/setup.sh`. Build your 
 - A nginx server runs on port `51300` inside the container.
   - reverse proxies `/monitor` to internal port `51301`
   - reverse proxies everything else to internal port `6901`
-  
+
 You only need to expose the port `51300` to the outside world.
 
 ## Run Standalone

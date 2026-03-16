@@ -1,4 +1,5 @@
 {
+  "drinode": "/dev/dri/renderD128",
   "presets": [
     {
       "name": "default",

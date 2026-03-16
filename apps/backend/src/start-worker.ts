@@ -6,7 +6,9 @@ import {
   WORKER_MONITOR_PORT,
   WORKER_PRESET_LABEL,
   WORKER_TITLE_LABEL,
+  renderDeviceGroupId,
 } from "./worker-container"
+import { config } from "./config"
 
 const SHARED_MEMORY_BYTES = 512 * 1024 * 1024
 const MEMORY_LIMIT_BYTES = 16 * 1024 * 1024 * 1024
@@ -72,6 +74,12 @@ export async function startWorkerContainer({
 }: StartWorkerParams) {
   const selectedPreset = getPreset(preset)
   const mergedEnv = {
+    ...(renderDeviceGroupId !== undefined
+      ? { 
+        DRINODE: config.drinode,
+        HW3D: "1",
+       }
+      : {}),
     ...selectedPreset.presetEnv,
     ...env,
   }
@@ -96,6 +104,9 @@ export async function startWorkerContainer({
       PortBindings: {
         [WORKER_MONITOR_PORT]: [{ HostPort: "" }],
       },
+      ...(renderDeviceGroupId !== undefined
+        ? { GroupAdd: [String(renderDeviceGroupId)] }
+        : {}),
       ShmSize: SHARED_MEMORY_BYTES,
       Memory: MEMORY_LIMIT_BYTES,
       CpuShares: 128,

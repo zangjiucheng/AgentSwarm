@@ -1,7 +1,9 @@
 import { createBunServeHandler } from "trpc-bun-adapter"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { config } from "./config"
 import { appRouter } from "./router"
+import { initializeWorkerContainerRuntime } from "./worker-container"
 
 function readEnv(name: string, fallback?: string) {
   return process.env[name] ?? fallback
@@ -91,6 +93,8 @@ async function handleFallback(request: Request) {
   return fetch(new Request(toFrontendUrl(request).toString(), request))
 }
 
+const renderDeviceGroupId = await initializeWorkerContainerRuntime()
+
 Bun.serve(
   createBunServeHandler(
     {
@@ -105,6 +109,15 @@ Bun.serve(
   ),
 )
 
+if (renderDeviceGroupId === undefined) {
+  console.log(
+    `[backend] no dri device group detected for ${config.drinode}, using software rendering`,
+  )
+} else {
+  console.log(
+    `[backend] detected dri device on ${config.drinode}, worker hardware acceleration is enabled`,
+  )
+}
 console.log(
   `[backend] listening on http://${host}:${port} (${isProduction ? "prod" : "dev"})`,
 )

@@ -61,6 +61,7 @@ And navigate to `http://localhost:14000` to access the frontend.
 
 An example configuration file is provided in [`/apps/backend/config.json`](./apps/backend/config.json).
 
+- `drinode` is the device node for hardware acceleration. (default: `/dev/dri/renderD128`)
 - `presetEnv` is a dictionary of predefined environment variables.
 - `requiredEnv` is an array of environment variables that must be set when starting a worker.
 
