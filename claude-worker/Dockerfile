@@ -13,9 +13,9 @@ RUN sudo apt-get update && sudo apt-get install -y \
     ffmpeg
 
 # patched kasmvncserver for running in iframe & default local scaling
-RUN wget https://github.com/PegasisForever/KasmVNC/releases/download/v1.5.0/kasmvncserver_1.5.0-1_amd64.deb && \
-    sudo env DEBIAN_FRONTEND=noninteractive dpkg --force-confdef --force-confold -i kasmvncserver_1.5.0-1_amd64.deb && \
-    rm kasmvncserver_1.5.0-1_amd64.deb
+RUN wget https://github.com/PegasisForever/KasmVNC/releases/download/v1.5.3/kasmvncserver_1.5.3-1_amd64.deb && \
+    sudo env DEBIAN_FRONTEND=noninteractive dpkg --force-confdef --force-confold -i kasmvncserver_1.5.3-1_amd64.deb && \
+    rm kasmvncserver_1.5.3-1_amd64.deb
 
 # patched vnc_startup.sh and config to not use ssl
 COPY vnc_startup.sh /dockerstartup/vnc_startup.sh
