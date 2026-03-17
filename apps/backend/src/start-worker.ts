@@ -3,10 +3,11 @@ import {
   docker,
   getPreset,
   readPublishedPort,
+  renderDeviceGroupId,
+  selfIp,
   WORKER_MONITOR_PORT,
   WORKER_PRESET_LABEL,
   WORKER_TITLE_LABEL,
-  renderDeviceGroupId,
 } from "./worker-container"
 import { config } from "./config"
 
@@ -77,10 +78,13 @@ export async function startWorkerContainer({
   const selectedPreset = getPreset(preset)
   const mergedEnv = {
     ...(renderDeviceGroupId !== undefined
-      ? { 
+      ? {
         DRINODE: config.drinode,
         HW3D: "1",
        }
+      : {}),
+    ...(selfIp !== undefined
+      ? { ORCHESTRATOR_ADDRESS: selfIp }
       : {}),
     ...selectedPreset.presetEnv,
     ...env,

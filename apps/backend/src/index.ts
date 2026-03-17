@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { config } from "./config"
 import { appRouter, type TRPCContext } from "./router"
-import { initializeWorkerContainerRuntime } from "./worker-container"
+import { initializeWorkerContainerRuntime, renderDeviceGroupId, selfIp } from "./worker-container"
 
 const requestIpMap = new WeakMap<Request, string>()
 
@@ -95,7 +95,7 @@ async function handleFallback(request: Request) {
   return fetch(new Request(toFrontendUrl(request).toString(), request))
 }
 
-const renderDeviceGroupId = await initializeWorkerContainerRuntime()
+await initializeWorkerContainerRuntime()
 
 const handler = createBunServeHandler(
   {
@@ -131,6 +131,11 @@ if (renderDeviceGroupId === undefined) {
   console.log(
     `[backend] detected dri device on ${config.drinode}, worker hardware acceleration is enabled`,
   )
+}
+if (selfIp === undefined) {
+  console.log(`[backend] not running in a container, ORCHESTRATOR_ADDRESS will not be set`)
+} else {
+  console.log(`[backend] detected container IP ${selfIp}, workers will receive ORCHESTRATOR_ADDRESS`)
 }
 console.log(
   `[backend] listening on http://${host}:${port} (${isProduction ? "prod" : "dev"})`,

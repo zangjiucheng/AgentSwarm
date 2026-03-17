@@ -1,4 +1,5 @@
 import Docker from "dockerode"
+import { hostname } from "node:os"
 import { PassThrough } from "node:stream"
 import { config } from "./config"
 
@@ -11,7 +12,8 @@ export const WORKER_PARENT_LABEL = "claudeswarm.parent"
 const RENDER_DEVICE_STAT_IMAGE = "busybox"
 
 export let renderDeviceGroupId: number | undefined
-let renderDeviceGroupIdInitialized = false
+export let selfIp: string | undefined
+let runtimeInitialized = false
 
 function followDockerProgress(stream: NodeJS.ReadableStream) {
   return new Promise<void>((resolve, reject) => {
@@ -88,12 +90,25 @@ async function inspectRenderDeviceGroupId() {
   return parseRenderDeviceGroupId(statOutput)
 }
 
-export async function initializeWorkerContainerRuntime() {
-  if (renderDeviceGroupIdInitialized) {
-    return renderDeviceGroupId
+async function inspectSelfIp() {
+  const containerId = hostname()
+  const container = docker.getContainer(containerId)
+  const inspection = await container.inspect()
+  const network = Object.values(inspection.NetworkSettings.Networks)[0]
+
+  if (!network?.IPAddress) {
+    throw new Error("No IP address found in container network settings")
   }
 
-  renderDeviceGroupIdInitialized = true
+  return network.IPAddress
+}
+
+export async function initializeWorkerContainerRuntime() {
+  if (runtimeInitialized) {
+    return
+  }
+
+  runtimeInitialized = true
 
   try {
     renderDeviceGroupId = await inspectRenderDeviceGroupId()
@@ -107,7 +122,17 @@ export async function initializeWorkerContainerRuntime() {
     renderDeviceGroupId = undefined
   }
 
-  return renderDeviceGroupId
+  try {
+    selfIp = await inspectSelfIp()
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error"
+
+    console.warn(
+      `[backend] failed to detect own container IP; ORCHESTRATOR_ADDRESS will not be set: ${message}`,
+    )
+    selfIp = undefined
+  }
 }
 
 export function getPreset(name: string) {
