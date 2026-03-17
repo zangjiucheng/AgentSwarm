@@ -103,6 +103,31 @@ def cmd_start_worker(args):
     print(json.dumps(result, indent=2))
 
 
+def cmd_start_sub_worker(args):
+    overwrite_env = {}
+    if args.env:
+        for pair in args.env:
+            if "=" not in pair:
+                print(f"Invalid env format '{pair}', expected KEY=VALUE", file=sys.stderr)
+                sys.exit(1)
+            k, v = pair.split("=", 1)
+            overwrite_env[k] = v
+    if args.unset:
+        for key in args.unset:
+            overwrite_env[key] = None
+
+    result = trpc_mutation(
+        args.base_url,
+        "startSubWorker",
+        {
+            "title": args.title,
+            "preset": args.preset,
+            "overwriteEnv": overwrite_env,
+        },
+    )
+    print(json.dumps(result, indent=2))
+
+
 def cmd_set_worker_output(args):
     output = sys.stdin.read()
     trpc_mutation(args.base_url, "setWorkerOutput", {"output": output})
@@ -135,6 +160,18 @@ def main():
         help="Environment variable (can be repeated)",
     )
 
+    start_sub = sub.add_parser("start-sub-worker", help="Start a sub-worker (inherits parent env/preset)")
+    start_sub.add_argument("title", help="Worker title")
+    start_sub.add_argument("--preset", default=None, help="Preset name (default: inherit from parent)")
+    start_sub.add_argument(
+        "-e", "--env", action="append", metavar="KEY=VALUE",
+        help="Overwrite environment variable (can be repeated)",
+    )
+    start_sub.add_argument(
+        "--unset", action="append", metavar="KEY",
+        help="Unset an inherited environment variable (can be repeated)",
+    )
+
     sub.add_parser("set-worker-output", help="Set output for the calling worker (reads from stdin)")
 
     get_output = sub.add_parser("get-worker-output", help="Get output for a worker")
@@ -149,6 +186,7 @@ def main():
         "workers": cmd_workers,
         "destroy-worker": cmd_destroy_worker,
         "start-worker": cmd_start_worker,
+        "start-sub-worker": cmd_start_sub_worker,
         "set-worker-output": cmd_set_worker_output,
         "get-worker-output": cmd_get_worker_output,
     }

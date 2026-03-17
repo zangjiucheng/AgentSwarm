@@ -4,7 +4,7 @@ import { destroyWorkerContainer } from "./destroy-worker"
 import { listWorkers } from "./list-workers"
 import { startWorkerContainer } from "./start-worker"
 import { config } from "./config"
-import { resolveWorkerByIp, WORKER_PARENT_LABEL } from "./worker-container"
+import { getContainerEnv, resolveWorkerByIp, WORKER_PARENT_LABEL } from "./worker-container"
 
 export type TRPCContext = {
   clientIp: string | undefined
@@ -136,38 +136,86 @@ export const appRouter = router({
         healthy: z.boolean(),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       try {
-        let parentId: string | undefined
-
-        if (ctx.clientIp) {
-          const caller = await resolveWorkerByIp(ctx.clientIp)
-
-          if (caller) {
-            if (caller.parentId) {
-              throw new TRPCError({
-                code: "FORBIDDEN",
-                message: "Sub-workers cannot create workers",
-              })
-            }
-
-            parentId = caller.id
-          }
-        }
-
-        return await startWorkerContainer({
-          ...input,
-          labels: parentId ? { [WORKER_PARENT_LABEL]: parentId } : undefined,
-        })
+        return await startWorkerContainer(input)
       } catch (error) {
-        if (error instanceof TRPCError) throw error
-
         console.error("[startWorker] failed to start worker", error)
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message:
             error instanceof Error ? error.message : "Failed to start worker",
+          cause: error,
+        })
+      }
+    }),
+  startSubWorker: publicProcedure
+    .input(
+      z.object({
+        title: z.string(),
+        preset: z.string().nullable(),
+        overwriteEnv: z.record(z.string(), z.string().nullable()),
+      }),
+    )
+    .output(
+      z.object({
+        id: z.string(),
+        port: z.number(),
+        healthy: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        if (!ctx.clientIp) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Unable to determine caller IP",
+          })
+        }
+
+        const caller = await resolveWorkerByIp(ctx.clientIp)
+
+        if (!caller) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Caller is not a managed worker",
+          })
+        }
+
+        if (caller.parentId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Sub-workers cannot create workers",
+          })
+        }
+
+        const parentEnv = await getContainerEnv(caller.id)
+        const env: Record<string, string> = { ...parentEnv }
+
+        for (const [key, value] of Object.entries(input.overwriteEnv)) {
+          if (value === null) {
+            delete env[key]
+          } else {
+            env[key] = value
+          }
+        }
+
+        return await startWorkerContainer({
+          title: input.title,
+          preset: input.preset ?? caller.preset ?? "default",
+          env,
+          labels: { [WORKER_PARENT_LABEL]: caller.id },
+        })
+      } catch (error) {
+        if (error instanceof TRPCError) throw error
+
+        console.error("[startSubWorker] failed to start sub-worker", error)
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error ? error.message : "Failed to start sub-worker",
           cause: error,
         })
       }

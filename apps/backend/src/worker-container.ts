@@ -181,12 +181,29 @@ export async function resolveWorkerByIp(ip: string) {
         return {
           id: container.Id,
           parentId: container.Labels?.[WORKER_PARENT_LABEL] || undefined,
+          preset: container.Labels?.[WORKER_PRESET_LABEL] || undefined,
         }
       }
     }
   }
 
   return undefined
+}
+
+export async function getContainerEnv(id: string) {
+  const container = docker.getContainer(id)
+  const inspection = await container.inspect()
+  const env: Record<string, string> = {}
+
+  for (const entry of inspection.Config.Env ?? []) {
+    const eqIdx = entry.indexOf("=")
+
+    if (eqIdx >= 0) {
+      env[entry.slice(0, eqIdx)] = entry.slice(eqIdx + 1)
+    }
+  }
+
+  return env
 }
 
 export async function findManagedContainerById(id: string) {
