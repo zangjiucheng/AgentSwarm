@@ -57,7 +57,7 @@ async function launchClaudeSession() {
   let claudeCommand = `claude --dangerously-skip-permissions --allow-dangerously-skip-permissions --effort high${claudePrompt ? ` ${shellEscape(claudePrompt)}` : ""}`
 
   if (process.env.CLAUDE_ONESHOT) {
-    claudeCommand = `${claudeCommand} -p | ./orchestrator.py set-worker-output; ./orchestrator.py destroy-worker`
+    claudeCommand = `${claudeCommand} -p | ~/orchestrator.py set-worker-output; ~/orchestrator.py destroy-worker`
   }
 
   await sendKeysToTmuxSession(

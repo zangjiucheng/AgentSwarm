@@ -9,7 +9,7 @@ import {
   WORKER_PRESET_LABEL,
   WORKER_TITLE_LABEL,
 } from "./worker-container"
-import { config } from "./config"
+import { config, port } from "./config"
 
 const SHARED_MEMORY_BYTES = 512 * 1024 * 1024
 const MEMORY_LIMIT_BYTES = 16 * 1024 * 1024 * 1024
@@ -84,7 +84,7 @@ export async function startWorkerContainer({
        }
       : {}),
     ...(selfIp !== undefined
-      ? { ORCHESTRATOR_ADDRESS: selfIp }
+      ? { ORCHESTRATOR_ADDRESS: selfIp, ORCHESTRATOR_PORT: String(port) }
       : {}),
     ...selectedPreset.presetEnv,
     ...env,

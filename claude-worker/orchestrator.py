@@ -12,11 +12,12 @@ import urllib.parse
 
 def get_base_url():
     orchestrator = os.environ.get("ORCHESTRATOR_ADDRESS")
+    port = os.environ.get("ORCHESTRATOR_PORT", "14000")
     if orchestrator:
-        url = f"http://{orchestrator}:3000/api/trpc"
-        print(f"[claudeswarm] using ORCHESTRATOR_ADDRESS: {url}", file=sys.stderr)
+        url = f"http://{orchestrator}:{port}/api/trpc"
+        print(f"[claudeswarm] using {url}", file=sys.stderr)
         return url
-    url = "http://localhost:3000/api/trpc"
+    url = "http://localhost:14000/api/trpc"
     print(f"[claudeswarm] ORCHESTRATOR_ADDRESS not set, using {url}", file=sys.stderr)
     return url
 

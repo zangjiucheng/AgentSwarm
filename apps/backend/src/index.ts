@@ -1,29 +1,10 @@
 import { createBunServeHandler } from "trpc-bun-adapter"
-import { dirname, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
-import { config } from "./config"
+import { resolve } from "node:path"
+import { config, port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath } from "./config"
 import { appRouter, type TRPCContext } from "./router"
 import { initializeWorkerContainerRuntime, renderDeviceGroupId, selfIp } from "./worker-container"
 
 const requestIpMap = new WeakMap<Request, string>()
-
-function readEnv(name: string, fallback?: string) {
-  return process.env[name] ?? fallback
-}
-
-const nodeEnv = readEnv("NODE_ENV", "development")
-const isProduction = nodeEnv === "production"
-const port = Number(readEnv("PORT", "3000"))
-const host = readEnv("HOST", "0.0.0.0")
-const frontendDevServer = readEnv(
-  "FRONTEND_DEV_SERVER",
-  "http://127.0.0.1:4100",
-)
-
-const currentDir = dirname(fileURLToPath(import.meta.url))
-const frontendDist =
-  readEnv("FRONTEND_DIST") ?? resolve(currentDir, "../../frontend/dist")
-const frontendIndexPath = resolve(frontendDist, "index.html")
 
 function isSpaNavigationRequest(request: Request) {
   if (request.method === "HEAD") {
@@ -112,10 +93,13 @@ const handler = createBunServeHandler(
   },
 )
 
+// eslint-disable-next-line @typescript-eslint/unbound-method
 const originalFetch = handler.fetch
 handler.fetch = async (req: Request, server: Parameters<typeof originalFetch>[1]) => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   const socketAddress = server.requestIP(req)
   if (socketAddress) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     requestIpMap.set(req, socketAddress.address)
   }
   return originalFetch(req, server)
@@ -135,7 +119,7 @@ if (renderDeviceGroupId === undefined) {
 if (selfIp === undefined) {
   console.log(`[backend] not running in a container, ORCHESTRATOR_ADDRESS will not be set`)
 } else {
-  console.log(`[backend] detected container IP ${selfIp}, workers will receive ORCHESTRATOR_ADDRESS`)
+  console.log(`[backend] detected container IP ${selfIp}, workers will receive ORCHESTRATOR_ADDRESS and ORCHESTRATOR_PORT=${port}`)
 }
 console.log(
   `[backend] listening on http://${host}:${port} (${isProduction ? "prod" : "dev"})`,

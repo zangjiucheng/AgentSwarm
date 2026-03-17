@@ -1,5 +1,7 @@
 import z from "zod"
 import { readFileSync } from "fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const DEFAULT_DRI_NODE = "/dev/dri/renderD128"
 
@@ -42,4 +44,20 @@ try {
   config = defaultConfig
 }
 
-export { config }
+// Use a helper to read env vars at runtime — direct process.env.X access
+// gets statically replaced by Bun's bundler at build time.
+function readEnv(name: string, fallback?: string) {
+  return process.env[name] ?? fallback
+}
+
+const port = Number(readEnv("PORT", "3000"))
+const host = readEnv("HOST", "0.0.0.0")!
+const nodeEnv = readEnv("NODE_ENV", "development")
+const isProduction = nodeEnv === "production"
+const frontendDevServer = readEnv("FRONTEND_DEV_SERVER", "http://127.0.0.1:4100")!
+
+const currentDir = dirname(fileURLToPath(import.meta.url))
+const frontendDist = readEnv("FRONTEND_DIST") ?? resolve(currentDir, "../../frontend/dist")
+const frontendIndexPath = resolve(frontendDist, "index.html")
+
+export { config, port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath }
