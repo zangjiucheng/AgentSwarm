@@ -92,6 +92,9 @@ Note: `--privileged` is required for Docker in Docker.
 
 After the container is running, you can access the desktop at `http://localhost:51300/`.
 
+The worker enables dynamic desktop resizing and bidirectional clipboard sharing through KasmVNC. Clipboard sync works best in Chromium-based browsers.
+For terminal sessions, tmux is configured to integrate with the system clipboard and the image includes `xclip`.
+
 ## Credits
 
 AgentSwarm is a fork of [PegasisForever/ClaudeSwarm](https://github.com/PegasisForever/ClaudeSwarm.git).

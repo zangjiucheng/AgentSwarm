@@ -31,6 +31,7 @@ RUN sudo apt-get update && sudo apt-get install -y \
     ffmpeg \
     openbox \
     dex \
+    xclip \
     xterm
 
 # upstream KasmVNC package for Ubuntu Jammy
