@@ -3,16 +3,15 @@ import {
   docker,
   getPreset,
   readPublishedPort,
-  renderDeviceGroupId,
   selfIp,
-  WORKER_MONITOR_PORT,
+  WORKER_WEB_PORT,
   WORKER_PRESET_LABEL,
   WORKER_TITLE_LABEL,
 } from "./worker-container"
-import { config, port } from "./config"
+import { port } from "./config"
 
-const SHARED_MEMORY_BYTES = 512 * 1024 * 1024
-const MEMORY_LIMIT_BYTES = 16 * 1024 * 1024 * 1024
+const SHARED_MEMORY_BYTES = 1024 * 1024 * 1024
+const MEMORY_LIMIT_BYTES = 8 * 1024 * 1024 * 1024
 const HEALTH_POLL_INTERVAL_MS = 1_000
 const HEALTH_TIMEOUT_MS = 60_000
 
@@ -104,12 +103,6 @@ export async function startWorkerContainer({
 }: StartWorkerParams) {
   const selectedPreset = getPreset(preset)
   const mergedEnv = {
-    ...(renderDeviceGroupId !== undefined
-      ? {
-        DRINODE: config.drinode,
-        HW3D: "1",
-       }
-      : {}),
     ...(selfIp !== undefined
       ? { ORCHESTRATOR_ADDRESS: selfIp, ORCHESTRATOR_PORT: String(port) }
       : {}),
@@ -125,15 +118,12 @@ export async function startWorkerContainer({
     Image: selectedPreset.imageTag,
     Env: toContainerEnv(mergedEnv),
     ExposedPorts: {
-      [WORKER_MONITOR_PORT]: {},
+      [WORKER_WEB_PORT]: {},
     },
     HostConfig: {
       PortBindings: {
-        [WORKER_MONITOR_PORT]: [{ HostPort: "" }],
+        [WORKER_WEB_PORT]: [{ HostPort: "" }],
       },
-      ...(renderDeviceGroupId !== undefined
-        ? { GroupAdd: [String(renderDeviceGroupId)] }
-        : {}),
       ShmSize: SHARED_MEMORY_BYTES,
       Memory: MEMORY_LIMIT_BYTES,
       CpuShares: 128,
@@ -161,7 +151,7 @@ export async function startWorkerContainer({
       await waitForHealth(container)
       healthy = true
     } catch (error) {
-      console.error("[startWorker] container not healthy, returning port anyway", error)
+      console.error("[startWorker] worker is reachable but not healthy yet", error)
     }
 
     return { id: container.id, port, healthy }

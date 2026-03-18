@@ -1,12 +1,4 @@
-export type WorkerPullRequest = {
-  baseBranch: string
-  branch: string
-  link: string
-  name: string
-  number: string
-}
-
-export type WorkerStatus = "working" | "idle" | "waiting" | "error" | "stopped"
+export type WorkerStatus = "ready" | "error" | "stopped"
 
 export type PresetInfo = {
   imageTag: string
@@ -19,7 +11,6 @@ export type WorkerInfo = {
   durationS: number
   port: number
   createdAt: number
-  pr?: WorkerPullRequest
   preset: string
   status: WorkerStatus
   title: string

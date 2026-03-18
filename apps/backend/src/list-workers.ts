@@ -1,6 +1,3 @@
-import { createTRPCProxyClient, httpBatchLink } from "@trpc/client"
-import type { inferRouterOutputs } from "@trpc/server"
-import type { MonitorRouterContract } from "@repo/monitor/contract"
 import type Docker from "dockerode"
 import {
   docker,
@@ -11,21 +8,16 @@ import {
   WORKER_TITLE_LABEL,
 } from "./worker-container"
 
-const MONITOR_TRPC_URL_PATH = "/monitor/trpc"
-const MONITOR_QUERY_TIMEOUT_MS = 1_000
 const WORKERS_CACHE_TTL_MS = 900
-
-type MonitorStatusOutput = inferRouterOutputs<MonitorRouterContract>["status"]
 
 export type WorkerInfo = {
   id: string
   title: string
   preset: string
-  status: "working" | "idle" | "waiting" | "error" | "stopped"
+  status: "ready" | "error" | "stopped"
   port: number
   durationS: number
   createdAt: number
-  pr?: MonitorStatusOutput["pr"]
 }
 
 export type WorkersResult = {
@@ -45,35 +37,6 @@ const workersCache: {
 
 function isCacheFresh() {
   return Date.now() - workersCache.fetchedAt <= WORKERS_CACHE_TTL_MS
-}
-
-function createMonitorClient(ipAddress: string, port: number) {
-  return createTRPCProxyClient<MonitorRouterContract>({
-    links: [
-      httpBatchLink({
-        url: `http://${ipAddress}:${port}${MONITOR_TRPC_URL_PATH}`,
-      }),
-    ],
-  })
-}
-
-async function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number) {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
-
-  try {
-    return await Promise.race([
-      operation(),
-      new Promise<T>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error(`Timed out after ${timeoutMs}ms`))
-        }, timeoutMs)
-      }),
-    ])
-  } finally {
-    if (timeoutId !== undefined) {
-      clearTimeout(timeoutId)
-    }
-  }
 }
 
 function parseStartedAtMs(isoTimestamp?: string) {
@@ -96,9 +59,9 @@ function getDurationS(
   return Math.max(0, Math.floor((Date.now() - baseTimestamp) / 1_000))
 }
 
-async function getContainerMonitorStatus(
+function getContainerMonitorStatus(
   container: Docker.ContainerInspectInfo,
-): Promise<MonitorStatusOutput | { status: "error" | "stopped" }> {
+): Pick<WorkerInfo, "status"> {
   if (!container.State.Running) {
     return {
       status: "stopped" as const,
@@ -107,32 +70,14 @@ async function getContainerMonitorStatus(
 
   const healthStatus = container.State.Health?.Status
 
-  if (healthStatus !== undefined && healthStatus !== "healthy") {
+  if (healthStatus === "healthy") {
     return {
-      status: "error" as const,
+      status: "ready" as const,
     }
   }
 
-  try {
-    const network = Object.values(container.NetworkSettings.Networks)[0]
-    if (!network) {
-      throw new Error("No network found for container")
-    }
-
-    const client = createMonitorClient(network.IPAddress, 51300)
-    return await withTimeout(
-      () => client.status.query(),
-      MONITOR_QUERY_TIMEOUT_MS,
-    )
-  } catch (error) {
-    console.error(
-      `[workers] failed to query monitor status for container ${container.Id}`,
-      error,
-    )
-
-    return {
-      status: "error" as const,
-    }
+  return {
+    status: "error" as const,
   }
 }
 
@@ -152,7 +97,7 @@ async function loadWorkers(): Promise<WorkersResult> {
     workerContainers.map(async (container) => {
       const inspection = await inspectWorkerContainer(container.Id)
       const port = readPublishedPort(inspection)
-      const monitorStatus = await getContainerMonitorStatus(inspection)
+      const monitorStatus = getContainerMonitorStatus(inspection)
 
       const parentId =
         inspection.Config.Labels?.[WORKER_PARENT_LABEL] ??
@@ -175,7 +120,6 @@ async function loadWorkers(): Promise<WorkersResult> {
           port: port ?? 0,
           durationS: getDurationS(inspection, container.Created),
           createdAt: container.Created,
-          pr: "pr" in monitorStatus ? monitorStatus.pr : undefined,
         } satisfies WorkerInfo,
       }
     }),

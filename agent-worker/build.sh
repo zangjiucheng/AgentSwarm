@@ -38,13 +38,6 @@ esac
 
 BUILD_ARGS=()
 
-if [ -n "${KASMVNC_SHA256_AMD64:-}" ]; then
-  BUILD_ARGS+=(--build-arg "KASMVNC_SHA256_AMD64=${KASMVNC_SHA256_AMD64}")
-fi
-if [ -n "${KASMVNC_SHA256_ARM64:-}" ]; then
-  BUILD_ARGS+=(--build-arg "KASMVNC_SHA256_ARM64=${KASMVNC_SHA256_ARM64}")
-fi
-
 if [ -n "$DOCKER_PLATFORMS" ]; then
   BUILD_ARGS+=(--platform "$DOCKER_PLATFORMS")
 fi

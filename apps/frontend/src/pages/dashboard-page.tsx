@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useNavigate, useParams } from "react-router"
 import { WorkerSidebar } from "../components/worker-sidebar"
 import { WorkerWorkspace } from "../components/worker-workspace"
 import type { WorkerInfo } from "../lib/api-types"
 import { trpc } from "../trpc"
 
-const MAX_CACHED_WORKSPACES = 6
-
-const WORKING_TO_NOTIFY: readonly string[] = ["idle", "waiting", "error"]
+const EMPTY_WORKERS: WorkerInfo[] = []
+const EMPTY_HIERARCHY: Record<string, string[]> = {}
 
 function showWorkerTransitionNotification(
   worker: WorkerInfo,
@@ -16,7 +15,7 @@ function showWorkerTransitionNotification(
 ) {
   if (!("Notification" in window) || Notification.permission !== "granted") return
 
-  const n = new Notification("Worker finished", {
+  const n = new Notification("Worker updated", {
     body: `${worker.title} (${worker.preset}) is now ${newStatus}`,
     tag: `worker-${worker.id}`,
   })
@@ -41,8 +40,6 @@ export function DashboardPage() {
     staleTime: Number.POSITIVE_INFINITY,
   })
   const destroyWorker = trpc.destroyWorker.useMutation()
-  const [recentIds, setRecentIds] = useState<string[]>([])
-  const [prevActiveId, setPrevActiveId] = useState<string | undefined>()
   const prevStatusById = useRef<Map<string, string>>(new Map())
 
   useEffect(() => {
@@ -52,8 +49,8 @@ export function DashboardPage() {
     }
   }, [])
 
-  const workers = workersQuery.data?.workers ?? []
-  const hierarchy = workersQuery.data?.hierarchy ?? {}
+  const workers = workersQuery.data?.workers ?? EMPTY_WORKERS
+  const hierarchy = workersQuery.data?.hierarchy ?? EMPTY_HIERARCHY
   const presets = presetsQuery.data ?? []
 
   useEffect(() => {
@@ -64,8 +61,8 @@ export function DashboardPage() {
       prev.set(worker.id, worker.status)
 
       if (
-        prevStatus === "working" &&
-        WORKING_TO_NOTIFY.includes(worker.status)
+        prevStatus === "error" &&
+        worker.status === "ready"
       ) {
         showWorkerTransitionNotification(worker, worker.status, (id) => {
           void navigate(`/${id}`)
@@ -80,23 +77,13 @@ export function DashboardPage() {
     }
   }, [workers, navigate])
 
-  if (activeId !== undefined && activeId !== prevActiveId) {
-    setPrevActiveId(activeId)
-    setRecentIds((prev) =>
-      [activeId, ...prev.filter((id) => id !== activeId)].slice(
-        0,
-        MAX_CACHED_WORKSPACES,
-      ),
-    )
-  }
-
-  const availableIds = new Set(workers.map((w) => w.id))
-
-  const cachedIds = recentIds.filter((id) => availableIds.has(id))
+  const availableIds = useMemo(
+    () => new Set(workers.map((w) => w.id)),
+    [workers],
+  )
 
   const getWorkerState = (id: string): "active" | "cached" | "unloaded" => {
     if (id === activeId) return "active"
-    if (cachedIds.includes(id)) return "cached"
     return "unloaded"
   }
 
@@ -104,7 +91,6 @@ export function DashboardPage() {
     await destroyWorker.mutateAsync({ id })
     await workersQuery.refetch()
 
-    setRecentIds((prev) => prev.filter((i) => i !== id))
     void navigate("/")
   }
 

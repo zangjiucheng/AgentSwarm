@@ -3,10 +3,7 @@ import { readFileSync } from "fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const DEFAULT_DRI_NODE = "/dev/dri/renderD128"
-
 const ConfigSchema = z.object({
-  drinode: z.string().default(DEFAULT_DRI_NODE),
   presets: z.array(
     z.object({
       name: z.string(),
@@ -18,15 +15,12 @@ const ConfigSchema = z.object({
 })
 
 const defaultConfig: z.infer<typeof ConfigSchema> = {
-  drinode: DEFAULT_DRI_NODE,
   presets: [
     {
       name: "default",
       imageTag: "agent-worker:latest",
       presetEnv: {},
-      requiredEnv: [
-        "CODEX_PROMPT",
-      ],
+      requiredEnv: [],
     },
   ],
 }

@@ -3,12 +3,6 @@
 @source '../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
 @custom-variant dark (&:is(.dark *));
 
-@import "@xterm/xterm/css/xterm.css";
-
 :root {
   color-scheme: dark;
-}
-
-.xterm-viewport {
-  overflow-y: hidden !important;
 }

@@ -16,9 +16,7 @@ export const router = t.router
 export const publicProcedure = t.procedure
 
 const workerStatusSchema = z.enum([
-  "working",
-  "idle",
-  "waiting",
+  "ready",
   "error",
   "stopped",
 ])
@@ -31,15 +29,6 @@ const workerSchema = z.object({
   port: z.number(),
   durationS: z.number(),
   createdAt: z.number(),
-  pr: z
-    .object({
-      name: z.string(),
-      number: z.string(),
-      link: z.string(),
-      branch: z.string(),
-      baseBranch: z.string(),
-    })
-    .optional(),
 })
 
 const workersSchema = z.object({

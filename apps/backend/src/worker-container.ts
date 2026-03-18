@@ -1,94 +1,16 @@
 import Docker from "dockerode"
 import { hostname } from "node:os"
-import { PassThrough } from "node:stream"
 import { config } from "./config"
 
 export const docker = new Docker()
 
-export const WORKER_MONITOR_PORT = "51300/tcp"
+export const WORKER_WEB_PORT = "51300/tcp"
 export const WORKER_PRESET_LABEL = "agentswarm.preset"
 export const WORKER_TITLE_LABEL = "agentswarm.title"
 export const WORKER_PARENT_LABEL = "agentswarm.parent"
-const RENDER_DEVICE_STAT_IMAGE = "busybox"
 
-export let renderDeviceGroupId: number | undefined
 export let selfIp: string | undefined
 let runtimeInitialized = false
-
-function followDockerProgress(stream: NodeJS.ReadableStream) {
-  return new Promise<void>((resolve, reject) => {
-    docker.modem.followProgress(stream, (error: Error | null) => {
-      if (error) {
-        reject(error)
-        return
-      }
-
-      resolve()
-    })
-  })
-}
-
-function parseRenderDeviceGroupId(statOutput: string) {
-  const gidMatch = statOutput.match(/Gid:\s+\(\s*(\d+)\s*\//)
-
-  if (!gidMatch) {
-    throw new Error(
-      `Failed to parse render device group id from stat output:\n${statOutput}`,
-    )
-  }
-
-  const gidText = gidMatch[1]
-
-  if (!gidText) {
-    throw new Error("Failed to read render device group id from stat output")
-  }
-
-  const gid = Number.parseInt(gidText, 10)
-
-  if (Number.isNaN(gid)) {
-    throw new Error(`Parsed invalid render device group id: ${gidText}`)
-  }
-
-  return gid
-}
-
-async function inspectRenderDeviceGroupId() {
-  await followDockerProgress(await docker.pull(RENDER_DEVICE_STAT_IMAGE))
-
-  const outputStream = new PassThrough()
-  outputStream.setEncoding("utf8")
-
-  let statOutput = ""
-  outputStream.on("data", (chunk: string) => {
-    statOutput += chunk
-  })
-
-  await new Promise<void>((resolve, reject) => {
-    docker.run(
-      RENDER_DEVICE_STAT_IMAGE,
-      ["stat", config.drinode],
-      outputStream,
-      {
-        Tty: true,
-        HostConfig: {
-          AutoRemove: true,
-          Privileged: true,
-        },
-      },
-      {},
-      (error) => {
-        if (error) {
-          reject(error instanceof Error ? error : new Error(String(error)))
-          return
-        }
-
-        resolve()
-      },
-    )
-  })
-
-  return parseRenderDeviceGroupId(statOutput)
-}
 
 async function inspectSelfIp() {
   const containerId = hostname()
@@ -109,18 +31,6 @@ export async function initializeWorkerContainerRuntime() {
   }
 
   runtimeInitialized = true
-
-  try {
-    renderDeviceGroupId = await inspectRenderDeviceGroupId()
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error while inspecting render device"
-
-    console.warn(
-      `[backend] failed to inspect ${config.drinode}; workers will start without supplemental group: ${message}`,
-    )
-    renderDeviceGroupId = undefined
-  }
 
   try {
     selfIp = await inspectSelfIp()
@@ -155,7 +65,7 @@ function isManagedContainer(container: Docker.ContainerInfo) {
 
 export function readPublishedPort(container: Docker.ContainerInspectInfo) {
   const hostPort =
-    container.NetworkSettings.Ports?.[WORKER_MONITOR_PORT]?.[0]?.HostPort
+    container.NetworkSettings.Ports?.[WORKER_WEB_PORT]?.[0]?.HostPort
 
   if (!hostPort) {
     return undefined

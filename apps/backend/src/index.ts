@@ -1,8 +1,8 @@
 import { createBunServeHandler } from "trpc-bun-adapter"
 import { resolve } from "node:path"
-import { config, port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath } from "./config"
+import { port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath } from "./config"
 import { appRouter, type TRPCContext } from "./router"
-import { initializeWorkerContainerRuntime, renderDeviceGroupId, selfIp } from "./worker-container"
+import { initializeWorkerContainerRuntime, selfIp } from "./worker-container"
 
 const requestIpMap = new WeakMap<Request, string>()
 
@@ -107,15 +107,6 @@ handler.fetch = async (req: Request, server: Parameters<typeof originalFetch>[1]
 
 Bun.serve(handler)
 
-if (renderDeviceGroupId === undefined) {
-  console.log(
-    `[backend] no dri device group detected for ${config.drinode}, using software rendering`,
-  )
-} else {
-  console.log(
-    `[backend] detected dri device on ${config.drinode}, worker hardware acceleration is enabled`,
-  )
-}
 if (selfIp === undefined) {
   console.log(`[backend] not running in a container, ORCHESTRATOR_ADDRESS will not be set`)
 } else {

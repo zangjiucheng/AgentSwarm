@@ -34,21 +34,9 @@ function WorkerItem({ worker }: { worker: WorkerInfo }) {
           className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${statusTone(worker.status)}`}
         />
         <span className="ml-2 text-gray-300">{worker.preset}</span>
+        <span className="ml-2 text-gray-500 uppercase">{worker.status}</span>
       </p>
       <p className="mt-2 text-base text-wrap">{worker.title}</p>
-      {worker.pr ? (
-        <a
-          className="mt-1 font-mono underline underline-offset-4 text-gray-300"
-          href={worker.pr.link}
-          rel="noreferrer"
-          target="_blank"
-          onClick={(e) => {
-            e.stopPropagation()
-          }}
-        >
-          {worker.pr.baseBranch} ← #{worker.pr.number}
-        </a>
-      ) : null}
     </Button>
   )
 }
@@ -75,6 +63,7 @@ function SubWorkerItem({ worker }: { worker: WorkerInfo }) {
           className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusTone(worker.status)}`}
         />
         <span className="ml-2 text-gray-300">{worker.preset}</span>
+        <span className="ml-2 text-gray-500 uppercase">{worker.status}</span>
       </p>
       <p className="mt-1 text-sm text-wrap">{worker.title}</p>
     </Button>
