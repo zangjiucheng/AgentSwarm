@@ -44,6 +44,33 @@ function toContainerEnv(env: Record<string, string>) {
   return Object.entries(env).map(([key, value]) => `${key}=${value}`)
 }
 
+async function ensureImageAvailable(imageTag: string) {
+  try {
+    await docker.getImage(imageTag).inspect()
+    return
+  } catch (error) {
+    const statusCode =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number"
+        ? error.statusCode
+        : undefined
+
+    if (statusCode !== 404) {
+      throw error
+    }
+  }
+
+  const pullStream = await docker.pull(imageTag)
+  await new Promise<void>((resolve, reject) => {
+    docker.modem.followProgress(pullStream, (err: Error | null) => {
+      if (err) return reject(err)
+      resolve()
+    })
+  })
+}
+
 async function waitForHealth(container: Docker.Container) {
   const deadline = Date.now() + HEALTH_TIMEOUT_MS
 
@@ -92,13 +119,7 @@ export async function startWorkerContainer({
 
   assertRequiredEnv(selectedPreset.requiredEnv, mergedEnv)
 
-  const pullStream = await docker.pull(selectedPreset.imageTag)
-  await new Promise<void>((resolve, reject) => {
-    docker.modem.followProgress(pullStream, (err: Error | null) => {
-      if (err) return reject(err)
-      resolve()
-    })
-  })
+  await ensureImageAvailable(selectedPreset.imageTag)
 
   const container = await docker.createContainer({
     Image: selectedPreset.imageTag,
@@ -116,7 +137,6 @@ export async function startWorkerContainer({
       ShmSize: SHARED_MEMORY_BYTES,
       Memory: MEMORY_LIMIT_BYTES,
       CpuShares: 128,
-      BlkioWeight: 100,
       Privileged: true,
     },
     Labels: {

@@ -25,21 +25,10 @@ const defaultConfig: z.infer<typeof ConfigSchema> = {
       imageTag: "agent-worker:latest",
       presetEnv: {},
       requiredEnv: [
-        "GITHUB_TOKEN",
-        "OPENAI_API_KEY",
         "CODEX_PROMPT",
       ],
     },
   ],
-}
-
-let config: z.infer<typeof ConfigSchema>
-try {
-  const rawConfig = readFileSync("./config.json", "utf-8")
-  config = ConfigSchema.parse(JSON.parse(rawConfig))
-} catch (e) {
-  console.warn("Failed to read config.json, using default config:", e)
-  config = defaultConfig
 }
 
 // Use a helper to read env vars at runtime — direct process.env.X access
@@ -47,6 +36,31 @@ try {
 function readEnv(name: string, fallback?: string) {
   return process.env[name] ?? fallback
 }
+
+let parsedConfig: z.infer<typeof ConfigSchema> | undefined
+const currentDir = dirname(fileURLToPath(import.meta.url))
+const configPaths = [
+  readEnv("CONFIG_PATH"),
+  "./config.json",
+  resolve(currentDir, "../config.json"),
+].filter((path): path is string => Boolean(path))
+
+let configError: unknown
+for (const configPath of configPaths) {
+  try {
+    const rawConfig = readFileSync(configPath, "utf-8")
+    parsedConfig = ConfigSchema.parse(JSON.parse(rawConfig))
+    break
+  } catch (e) {
+    configError = e
+  }
+}
+
+if (!parsedConfig) {
+  console.warn("Failed to read config file, using default config:", configError)
+  parsedConfig = defaultConfig
+}
+const config = parsedConfig
 
 const port = Number(readEnv("PORT", "3000"))
 const host = readEnv("HOST", "0.0.0.0")!
@@ -56,8 +70,6 @@ const frontendDevServer = readEnv(
   "FRONTEND_DEV_SERVER",
   "http://127.0.0.1:4100",
 )!
-
-const currentDir = dirname(fileURLToPath(import.meta.url))
 const frontendDist =
   readEnv("FRONTEND_DIST") ?? resolve(currentDir, "../../frontend/dist")
 const frontendIndexPath = resolve(frontendDist, "index.html")

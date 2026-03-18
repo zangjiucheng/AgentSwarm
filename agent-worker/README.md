@@ -8,7 +8,7 @@
 
 - `agent-worker:latest` - Built on top of `:base` with Codex and additional automation. Includes:
   - Kasm VNC Server (custom fork to work in iframe)
-  - Ubuntu 22.04 LTS with a minimal i3 desktop session, fixed 1080p resolution
+  - Ubuntu 22.04 LTS with a minimal Openbox desktop session, fixed 1080p resolution
   - Node.js 22.x LTS
   - Screen record skill
   - Computer use MCP
@@ -21,14 +21,14 @@
 
 This image (`agent-worker:latest`) is intended to be used as a **starting point**. End users should build their own images on top of this to add their development tools, project dependencies, and custom configurations.
 
-This image uses the Kasm Ubuntu base directly. It no longer depends on `claude-worker:base`. It does not run NixOS inside the container. The performance-oriented change in this repo is switching the active desktop session from XFCE to i3, which removes a significant amount of desktop overhead without rewriting the full Kasm/VNC stack.
+This image uses the Kasm Ubuntu base directly. It no longer depends on `claude-worker:base`. It does not run NixOS inside the container. The performance-oriented change in this repo is switching the active desktop session from XFCE to Openbox, which removes a significant amount of desktop overhead without rewriting the full Kasm/VNC stack.
 
-The worker build is mac-compatible in the sense that you can build it from macOS with Docker Desktop. On Apple Silicon, the build script defaults to `linux/amd64`. The Dockerfile downloads the official upstream `kasmtech/KasmVNC` Ubuntu Jammy package for the selected architecture.
+The worker build is mac-compatible in the sense that you can build it from macOS with Docker Desktop. On Apple Silicon, the build script defaults to `linux/arm64`. The Dockerfile downloads the official upstream `kasmtech/KasmVNC` Ubuntu Jammy package for the selected architecture.
 
 Current `linux/arm64` gaps:
 
 - the upstream base image used here has not been validated in this repo for an `arm64` desktop flow
-- the full stack still needs runtime validation on `arm64`: KasmVNC, i3, nginx, DinD, and the monitor daemon
+- the full stack still needs runtime validation on `arm64`: KasmVNC, Openbox, nginx, DinD, and the monitor daemon
 
 Build examples:
 
@@ -46,7 +46,7 @@ When the container starts, the [`monitor`](../apps/monitor) process initializes 
 1. It creates two tmux sessions: `codex` and `terminal`.
 2. It runs `source ~/setup.sh` inside the `codex` tmux session.
 3. It reads `codex` tmux session's current working directory and changes the `terminal` tmux session into the same directory.
-4. If `OPENAI_API_KEY` is present, it signs Codex in non-interactively.
+4. It checks for an existing Codex login session first. If none exists and `OPENAI_API_KEY` is present, it signs Codex in non-interactively.
 5. It starts Codex in the `codex` session, appending `CODEX_PROMPT` when provided.
 
 For end-user customization, the most important hook is `~/setup.sh`. Build your own image on top of this one and replace that file to install dependencies, export environment variables, clone repositories, or prepare the workspace before Codex starts.
@@ -55,13 +55,15 @@ For end-user customization, the most important hook is `~/setup.sh`. Build your 
 
 | Variable              | Description                                                                                                       |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `OPENAI_API_KEY`      | API key for authenticating Codex in headless/programmatic workflows                                               |
-| `GITHUB_TOKEN`        | GitHub personal access token for repository operations                                                            |
+| `OPENAI_API_KEY`      | Optional fallback API key for authenticating Codex when no existing login session is present                      |
+| `GITHUB_TOKEN`        | Optional GitHub personal access token for repository operations                                                   |
 | `CODEX_PROMPT`        | Initial prompt to send to Codex on startup                                                                        |
 | `CODEX_ONESHOT`       | If set, Codex runs in non-interactive mode, reports the final answer to the orchestrator, and then self-destructs |
-| `START_DE`            | Desktop session to launch. Defaults to `i3`. Set to `xfce4-session`, `openbox`, or `kde5` only if needed.       |
+| `START_DE`            | Desktop session to launch. Defaults to `openbox`. Set to `xfce4-session` or `kde5` only if needed.              |
 
 Only `CODEX_PROMPT` and `CODEX_ONESHOT` are supported.
+
+The default working directory is `~/workers`. The startup flow creates it automatically and launches both the `codex` and `terminal` tmux sessions there.
 
 ## Ports
 
@@ -82,7 +84,6 @@ docker run --rm -d \
   --shm-size=512m \
   -p 51300:51300 \
   --privileged \
-  -e OPENAI_API_KEY=sk-xxx \
   # more environment variables...
   agent-worker:latest
 ```

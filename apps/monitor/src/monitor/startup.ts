@@ -57,7 +57,7 @@ function buildAgentCommand() {
   const prompt = getPrompt()
   const promptArg = prompt ? ` ${shellEscape(prompt)}` : ""
   const loginCommand =
-    'if [ -n "${OPENAI_API_KEY:-}" ]; then printenv OPENAI_API_KEY | codex login --with-api-key >/tmp/codex-login.log 2>&1 || { cat /tmp/codex-login.log; exit 1; }; fi'
+    'if codex login status >/tmp/codex-login-status.log 2>&1; then cat /tmp/codex-login-status.log >/dev/null; elif [ -n "${OPENAI_API_KEY:-}" ]; then printenv OPENAI_API_KEY | codex login --with-api-key >/tmp/codex-login.log 2>&1 || { cat /tmp/codex-login.log; exit 1; }; else cat /tmp/codex-login-status.log; fi'
 
   if (getOneShotEnabled()) {
     return `${loginCommand}; codex --search exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -o /tmp/codex-output.txt${promptArg}; status=$?; if [ -f /tmp/codex-output.txt ]; then cat /tmp/codex-output.txt | ~/orchestrator.py set-worker-output; fi; ~/orchestrator.py destroy-worker; exit $status`

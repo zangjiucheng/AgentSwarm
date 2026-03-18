@@ -184,6 +184,7 @@ export function WorkerWorkspace({
     state === "active"
       ? "pointer-events-auto opacity-100"
       : "pointer-events-none opacity-0"
+  const hasWorkerPort = workerPort > 0
 
   return (
     <>
@@ -257,12 +258,26 @@ export function WorkerWorkspace({
         className={`absolute inset-0 flex flex-col ${hiddenClass}`}
         ref={shellRef}
       >
-        <iframe
-          allow="autoplay; microphone; clipboard-read; clipboard-write; fullscreen; self"
-          allowFullScreen
-          className="h-full w-full border-0 bg-[#282828]"
-          src={getWorkerIframeUrl(workerPort)}
-        />
+        {hasWorkerPort ? (
+          <iframe
+            allow="autoplay; microphone; clipboard-read; clipboard-write; fullscreen; self"
+            allowFullScreen
+            className="h-full w-full border-0 bg-[#282828]"
+            src={getWorkerIframeUrl(workerPort)}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-[#282828] px-6">
+            <div className="max-w-md text-center">
+              <p className="text-default-300 text-sm font-medium">
+                Worker is not ready
+              </p>
+              <p className="text-default-500 mt-2 text-xs">
+                The container did not publish a desktop port. Check the worker
+                logs or Docker Desktop for the startup failure.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="relative shrink-0 border-t border-gray-500">
           <div
@@ -330,19 +345,29 @@ export function WorkerWorkspace({
                 </p>
               </div>
             </div>
-            {terminalSessions.map((session) => (
-              <TerminalSession
-                command={session.command}
-                isActive={
-                  activeTerminal === session.value && state === "active"
-                }
-                key={session.value}
-                onPasteFiles={uploadFiles}
-                port={workerPort}
-                ref={session.value === "codex" ? codexTerminalRef : terminalRef}
-                title={session.label}
-              />
-            ))}
+            {hasWorkerPort ? (
+              terminalSessions.map((session) => (
+                <TerminalSession
+                  command={session.command}
+                  isActive={
+                    activeTerminal === session.value && state === "active"
+                  }
+                  key={session.value}
+                  onPasteFiles={uploadFiles}
+                  port={workerPort}
+                  ref={
+                    session.value === "codex" ? codexTerminalRef : terminalRef
+                  }
+                  title={session.label}
+                />
+              ))
+            ) : (
+              <div className="flex h-full items-center justify-center bg-[#282828] px-6">
+                <p className="text-default-500 text-xs">
+                  Terminal will appear after the worker publishes its port.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>

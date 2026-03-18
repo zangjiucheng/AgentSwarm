@@ -29,29 +29,23 @@ RUN sudo apt-get update && sudo apt-get install -y \
     nginx \
     nodejs \
     ffmpeg \
-    i3-wm \
-    i3status \
-    dmenu \
+    openbox \
     dex \
     xterm
 
 # upstream KasmVNC package for Ubuntu Jammy
-RUN case "${TARGETARCH}" in \
-      amd64) \
-        KASMVNC_DEB="kasmvncserver_jammy_${KASMVNC_VERSION}_amd64.deb" && \
-        KASMVNC_URL="https://github.com/kasmtech/KasmVNC/releases/download/v${KASMVNC_VERSION}/${KASMVNC_DEB}" && \
-        KASMVNC_SHA256="${KASMVNC_SHA256_AMD64}" && \
-        ;; \
-      arm64) \
-        KASMVNC_DEB="kasmvncserver_jammy_${KASMVNC_VERSION}_arm64.deb" && \
-        KASMVNC_URL="https://github.com/kasmtech/KasmVNC/releases/download/v${KASMVNC_VERSION}/${KASMVNC_DEB}" && \
-        KASMVNC_SHA256="${KASMVNC_SHA256_ARM64}" && \
-        ;; \
-      *) \
-        echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2 && \
-        exit 1 \
-        ;; \
-    esac && \
+RUN if [ "${TARGETARCH}" = "amd64" ]; then \
+      KASMVNC_DEB="kasmvncserver_jammy_${KASMVNC_VERSION}_amd64.deb"; \
+      KASMVNC_URL="https://github.com/kasmtech/KasmVNC/releases/download/v${KASMVNC_VERSION}/${KASMVNC_DEB}"; \
+      KASMVNC_SHA256="${KASMVNC_SHA256_AMD64}"; \
+    elif [ "${TARGETARCH}" = "arm64" ]; then \
+      KASMVNC_DEB="kasmvncserver_jammy_${KASMVNC_VERSION}_arm64.deb"; \
+      KASMVNC_URL="https://github.com/kasmtech/KasmVNC/releases/download/v${KASMVNC_VERSION}/${KASMVNC_DEB}"; \
+      KASMVNC_SHA256="${KASMVNC_SHA256_ARM64}"; \
+    else \
+      echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; \
+      exit 1; \
+    fi && \
     wget -O "${KASMVNC_DEB}" "${KASMVNC_URL}" && \
     if [ -n "${KASMVNC_SHA256}" ]; then \
       echo "${KASMVNC_SHA256}  ${KASMVNC_DEB}" | sha256sum -c -; \
@@ -62,6 +56,7 @@ RUN case "${TARGETARCH}" in \
 # patched vnc_startup.sh and config to not use ssl
 COPY agent-worker/vnc_startup.sh /dockerstartup/vnc_startup.sh
 COPY agent-worker/kasmvnc.yaml /etc/kasmvnc/kasmvnc.yaml
+COPY --chown=kasm-user:kasm-user agent-worker/kasmvnc.yaml /home/kasm-user/.vnc/kasmvnc.yaml
 RUN sudo rm -f /etc/nginx/sites-enabled/default
 
 ENV PATH="/home/kasm-user/.local/bin:$PATH"
@@ -72,7 +67,7 @@ ENV VNC_RESOLUTION=1920x1080
 ENV MAX_FRAME_RATE=15
 ENV VNCOPTIONS="${VNCOPTIONS} -disableBasicAuth"
 ENV START_XFCE4=0
-ENV START_DE=i3
+ENV START_DE=openbox
 
 # GH CLI
 # auth using GITHUB_TOKEN
@@ -103,9 +98,10 @@ RUN touch /tmp/monitor_flag
 RUN sudo usermod --shell /bin/bash kasm-user
 COPY --chown=kasm-user:kasm-user agent-worker/tmux.conf /home/kasm-user/.tmux.conf
 COPY --chown=kasm-user:kasm-user agent-worker/bashrc /home/kasm-user/.bashrc
-COPY --chown=kasm-user:kasm-user agent-worker/i3.config /home/kasm-user/.config/i3/config
+COPY --chown=kasm-user:kasm-user agent-worker/openbox-autostart /home/kasm-user/.config/openbox/autostart
 COPY --chown=kasm-user:kasm-user agent-worker/setup.sh /home/kasm-user/setup.sh
-RUN rm /home/kasm-user/.bash_history
+RUN mkdir -p /home/kasm-user/Desktop /home/kasm-user/Downloads /home/kasm-user/Uploads /home/kasm-user/workers
+RUN rm -f /home/kasm-user/.bash_history
 RUN rm -rf /home/kasm-user/.vnc
 
 # orchestrator cli

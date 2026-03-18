@@ -12,6 +12,7 @@ FROM oven/bun:1 AS runtime
 WORKDIR /app
 
 COPY --from=builder /app/apps/backend/dist /app/apps/backend/dist
+COPY --from=builder /app/apps/backend/config.json /app/apps/backend/config.json
 COPY --from=builder /app/apps/frontend/dist /app/apps/frontend/dist
 
 ENV NODE_ENV=production

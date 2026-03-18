@@ -1,0 +1,3 @@
+xsetroot -solid "#1f1f1f" &
+xterm -title codex -e sh -lc 'mkdir -p "$HOME/workers"; exec tmux new-session -A -s codex -c "$HOME/workers"' &
+xterm -title terminal -e sh -lc 'mkdir -p "$HOME/workers"; exec tmux new-session -A -s terminal -c "$HOME/workers"' &
