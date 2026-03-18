@@ -1,20 +1,29 @@
-import z from "zod"
-import { readFileSync } from "fs"
+import { readFileSync, writeFileSync } from "fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import z from "zod"
 
-const ConfigSchema = z.object({
-  presets: z.array(
-    z.object({
-      name: z.string(),
-      imageTag: z.string(),
-      presetEnv: z.record(z.string(), z.string()),
-      requiredEnv: z.array(z.string()),
-    }),
-  ),
+const PresetSchema = z.object({
+  name: z.string(),
+  imageTag: z.string(),
+  presetEnv: z.record(z.string(), z.string()),
+  requiredEnv: z.array(z.string()),
 })
 
-const defaultConfig: z.infer<typeof ConfigSchema> = {
+const ConfigSchema = z
+  .object({
+    globalEnv: z.record(z.string(), z.string()).default({}),
+    presets: z.array(PresetSchema),
+  })
+  .passthrough()
+
+type AppConfig = {
+  globalEnv: Record<string, string>
+  presets: z.infer<typeof PresetSchema>[]
+}
+
+const defaultConfig: AppConfig = {
+  globalEnv: {},
   presets: [
     {
       name: "default",
@@ -31,7 +40,14 @@ function readEnv(name: string, fallback?: string) {
   return process.env[name] ?? fallback
 }
 
-let parsedConfig: z.infer<typeof ConfigSchema> | undefined
+function toAppConfig(rawConfig: unknown) {
+  const parsed = ConfigSchema.parse(rawConfig)
+  return {
+    globalEnv: parsed.globalEnv,
+    presets: parsed.presets,
+  } satisfies AppConfig
+}
+
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const configPaths = [
   readEnv("CONFIG_PATH"),
@@ -39,22 +55,53 @@ const configPaths = [
   resolve(currentDir, "../config.json"),
 ].filter((path): path is string => Boolean(path))
 
+let configFilePath = readEnv("CONFIG_PATH") ?? resolve(currentDir, "../config.json")
+let rawConfigObject: Record<string, unknown> = {}
+let config: AppConfig = defaultConfig
+let configLoaded = false
 let configError: unknown
+
 for (const configPath of configPaths) {
   try {
-    const rawConfig = readFileSync(configPath, "utf-8")
-    parsedConfig = ConfigSchema.parse(JSON.parse(rawConfig))
+    const rawConfig = JSON.parse(readFileSync(configPath, "utf-8")) as Record<
+      string,
+      unknown
+    >
+    config = toAppConfig(rawConfig)
+    rawConfigObject = rawConfig
+    configFilePath = configPath
+    configLoaded = true
+    configError = undefined
     break
-  } catch (e) {
-    configError = e
+  } catch (error) {
+    configError = error
   }
 }
 
-if (!parsedConfig) {
+if (!configLoaded) {
   console.warn("Failed to read config file, using default config:", configError)
-  parsedConfig = defaultConfig
+  rawConfigObject = { ...defaultConfig }
 }
-const config = parsedConfig
+
+function persistConfig(nextConfig: AppConfig) {
+  const nextRawConfig: Record<string, unknown> = {
+    ...rawConfigObject,
+    globalEnv: nextConfig.globalEnv,
+    presets: nextConfig.presets,
+  }
+
+  writeFileSync(configFilePath, `${JSON.stringify(nextRawConfig, null, 2)}\n`)
+
+  rawConfigObject = nextRawConfig
+  config = nextConfig
+}
+
+function setGlobalEnv(globalEnv: Record<string, string>) {
+  persistConfig({
+    ...config,
+    globalEnv,
+  })
+}
 
 const port = Number(readEnv("PORT", "3000"))
 const host = readEnv("HOST", "0.0.0.0")!
@@ -70,6 +117,7 @@ const frontendIndexPath = resolve(frontendDist, "index.html")
 
 export {
   config,
+  setGlobalEnv,
   port,
   host,
   isProduction,

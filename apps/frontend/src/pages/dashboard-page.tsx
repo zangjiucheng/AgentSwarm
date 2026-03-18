@@ -39,6 +39,10 @@ export function DashboardPage() {
     gcTime: Number.POSITIVE_INFINITY,
     staleTime: Number.POSITIVE_INFINITY,
   })
+  const globalSettingsQuery = trpc.globalSettings.useQuery(undefined, {
+    gcTime: Number.POSITIVE_INFINITY,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
   const destroyWorker = trpc.destroyWorker.useMutation()
   const prevStatusById = useRef<Map<string, string>>(new Map())
 
@@ -52,6 +56,9 @@ export function DashboardPage() {
   const workers = workersQuery.data?.workers ?? EMPTY_WORKERS
   const hierarchy = workersQuery.data?.hierarchy ?? EMPTY_HIERARCHY
   const presets = presetsQuery.data ?? []
+  const globalSettings = globalSettingsQuery.data ?? {
+    githubTokenConfigured: false,
+  }
 
   useEffect(() => {
     const prev = prevStatusById.current
@@ -98,6 +105,7 @@ export function DashboardPage() {
     <>
       <div className="bg-background text-foreground flex min-h-screen">
         <WorkerSidebar
+          globalSettings={globalSettings}
           presets={presets}
           workers={workers}
           hierarchy={hierarchy}

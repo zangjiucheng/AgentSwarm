@@ -1,12 +1,15 @@
 import { Button } from "@heroui/react"
-import { IconPlus } from "@tabler/icons-react"
+import { IconPlus, IconSettings } from "@tabler/icons-react"
 import { useState } from "react"
 import { Link, useParams } from "react-router"
-import type { PresetInfo, WorkerInfo } from "../lib/api-types"
+import type { GlobalSettings, PresetInfo, WorkerInfo } from "../lib/api-types"
 import { formatDuration, statusTone } from "../lib/format"
 import { AddWorkerModal } from "./add-worker-modal"
+import { BrandLogo } from "./brand-logo"
+import { GlobalSettingsModal } from "./global-settings-modal"
 
 type WorkerSidebarProps = {
+  globalSettings: GlobalSettings
   presets: PresetInfo[]
   workers: WorkerInfo[]
   hierarchy: Record<string, string[]>
@@ -70,8 +73,14 @@ function SubWorkerItem({ worker }: { worker: WorkerInfo }) {
   )
 }
 
-export function WorkerSidebar({ presets, workers, hierarchy }: WorkerSidebarProps) {
+export function WorkerSidebar({
+  globalSettings,
+  presets,
+  workers,
+  hierarchy,
+}: WorkerSidebarProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   const workerById = new Map(workers.map((w) => [w.id, w]))
   const childIds = new Set(Object.values(hierarchy).flat())
@@ -81,18 +90,31 @@ export function WorkerSidebar({ presets, workers, hierarchy }: WorkerSidebarProp
     <>
       <aside className="h-screen w-[20rem] shrink-0 bg-[#282828] p-3">
         <div className="h-full rounded-lg bg-[#353535]">
-          <div className="flex items-center justify-between px-4 py-4">
-            <h1 className="text-default-600 text-xs font-semibold tracking-[0.4em] uppercase">
-              AgentSwarm
-            </h1>
-            <Button
-              isIconOnly
-              onPress={() => setIsAddModalOpen(true)}
-              size="sm"
-              variant="light"
-            >
-              <IconPlus size={18} />
-            </Button>
+          <div className="flex items-center justify-between gap-3 px-4 py-4">
+            <BrandLogo compact />
+            <div className="flex items-center gap-1">
+              <div className="relative">
+                <Button
+                  isIconOnly
+                  onPress={() => setIsSettingsModalOpen(true)}
+                  size="sm"
+                  variant="light"
+                >
+                  <IconSettings size={18} />
+                </Button>
+                {globalSettings.githubTokenConfigured ? (
+                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-emerald-400" />
+                ) : null}
+              </div>
+              <Button
+                isIconOnly
+                onPress={() => setIsAddModalOpen(true)}
+                size="sm"
+                variant="light"
+              >
+                <IconPlus size={18} />
+              </Button>
+            </div>
           </div>
           {topLevelWorkers.length > 0 ? (
             <div className="flex flex-col">
@@ -119,6 +141,11 @@ export function WorkerSidebar({ presets, workers, hierarchy }: WorkerSidebarProp
         isOpen={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
         presets={presets}
+      />
+      <GlobalSettingsModal
+        isOpen={isSettingsModalOpen}
+        onOpenChange={setIsSettingsModalOpen}
+        settings={globalSettings}
       />
     </>
   )

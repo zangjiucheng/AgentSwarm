@@ -1,5 +1,9 @@
 export type WorkerStatus = "ready" | "error" | "stopped"
 
+export type GlobalSettings = {
+  githubTokenConfigured: boolean
+}
+
 export type PresetInfo = {
   imageTag: string
   name: string
@@ -22,6 +26,7 @@ export type WorkersResponse = {
 }
 
 export type StartWorkerInput = {
+  cloneRepositoryUrl?: string
   env: Record<string, string>
   preset: string
   title: string

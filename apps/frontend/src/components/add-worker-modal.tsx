@@ -32,6 +32,7 @@ export function AddWorkerModal({
 
   const [title, setTitle] = useState("")
   const [presetName, setPresetName] = useState("")
+  const [cloneRepositoryUrl, setCloneRepositoryUrl] = useState("")
   const [envValues, setEnvValues] = useState<Record<string, string>>({})
   const [showLongLoadHint, setShowLongLoadHint] = useState(false)
 
@@ -70,16 +71,20 @@ export function AddWorkerModal({
       env: Object.fromEntries(
         selectedPreset.requiredEnv.map((key) => [key, envValues[key] ?? ""]),
       ),
+      ...(cloneRepositoryUrl.trim()
+        ? { cloneRepositoryUrl: cloneRepositoryUrl.trim() }
+        : {}),
     }
 
     const origin = window.location.origin
     return `curl -X POST '${origin}/api/trpc/startWorker' \\\n  -H 'content-type: application/json' \\\n  -d '${JSON.stringify(input)}'`
-  }, [title, selectedPreset, envValues])
+  }, [title, selectedPreset, envValues, cloneRepositoryUrl])
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setTitle("")
       setPresetName("")
+      setCloneRepositoryUrl("")
       setEnvValues({})
       setShowLongLoadHint(false)
       startWorker.reset()
@@ -133,6 +138,14 @@ export function AddWorkerModal({
                   No presets are currently available from the backend.
                 </p>
               ) : null}
+
+              <Input
+                description="Optional. The worker will clone this repo and open code-server in the cloned directory."
+                label="Repository URL"
+                onValueChange={setCloneRepositoryUrl}
+                placeholder="https://github.com/org/repo.git or git@github.com:org/repo.git"
+                value={cloneRepositoryUrl}
+              />
 
               {selectedPreset ? (
                 <div className="grid grid-cols-[auto_1fr] items-start gap-x-4 gap-y-4">
@@ -188,6 +201,9 @@ export function AddWorkerModal({
                     }
 
                     startWorker.mutate({
+                      ...(cloneRepositoryUrl.trim()
+                        ? { cloneRepositoryUrl: cloneRepositoryUrl.trim() }
+                        : {}),
                       env: Object.fromEntries(
                         selectedPreset.requiredEnv.map((key) => [
                           key,

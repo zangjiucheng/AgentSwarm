@@ -40,7 +40,13 @@ When you create a worker from the UI, the default image tag is `agent-worker:lat
 
 `GITHUB_TOKEN` is also optional. GitHub-specific operations such as PR inspection or authenticated remote access will only work when a token is available.
 
+You can now configure `GITHUB_TOKEN` once from the dashboard's global settings. It is persisted in the backend config and injected into newly created workers automatically.
+
 Each worker now exposes a single `code-server` web IDE on its published port. The dashboard embeds that IDE directly instead of showing a desktop/VNC session or custom terminal panes.
+
+When creating a worker from the dashboard, you can optionally provide a repository URL. The worker will clone that repository on first boot and open `code-server` directly in the cloned directory.
+
+The worker image is Nix-based and declares its toolchain in [`agent-worker/flake.nix`](/Users/jiucheng/Dev/AgentSwarm/agent-worker/flake.nix). The pinned package set lives in [`agent-worker/flake.lock`](/Users/jiucheng/Dev/AgentSwarm/agent-worker/flake.lock).
 
 ## Credits
 

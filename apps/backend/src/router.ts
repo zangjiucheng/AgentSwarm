@@ -3,7 +3,7 @@ import { z } from "zod"
 import { destroyWorkerContainer } from "./destroy-worker"
 import { listWorkers } from "./list-workers"
 import { startWorkerContainer } from "./start-worker"
-import { config } from "./config"
+import { config, setGlobalEnv } from "./config"
 import { getContainerEnv, resolveWorkerByIp, WORKER_PARENT_LABEL } from "./worker-container"
 
 export type TRPCContext = {
@@ -44,6 +44,10 @@ const presetsSchema = z.array(
   }),
 )
 
+const globalSettingsSchema = z.object({
+  githubTokenConfigured: z.boolean(),
+})
+
 const workerOutputs = new Map<string, string>()
 
 export const appRouter = router({
@@ -61,6 +65,35 @@ export const appRouter = router({
   presets: publicProcedure.output(presetsSchema).query(() => {
     return config.presets
   }),
+  globalSettings: publicProcedure
+    .output(globalSettingsSchema)
+    .query(() => {
+      return {
+        githubTokenConfigured: Boolean(config.globalEnv.GITHUB_TOKEN),
+      }
+    }),
+  saveGlobalSettings: publicProcedure
+    .input(
+      z.object({
+        githubToken: z.string().trim().min(1).nullable(),
+      }),
+    )
+    .output(globalSettingsSchema)
+    .mutation(({ input }) => {
+      const nextGlobalEnv = { ...config.globalEnv }
+
+      if (input.githubToken) {
+        nextGlobalEnv.GITHUB_TOKEN = input.githubToken
+      } else {
+        delete nextGlobalEnv.GITHUB_TOKEN
+      }
+
+      setGlobalEnv(nextGlobalEnv)
+
+      return {
+        githubTokenConfigured: Boolean(nextGlobalEnv.GITHUB_TOKEN),
+      }
+    }),
   workers: publicProcedure.output(workersSchema).query(async () => {
     return listWorkers()
   }),
@@ -116,6 +149,7 @@ export const appRouter = router({
         title: z.string(),
         preset: z.string(),
         env: z.record(z.string(), z.string()),
+        cloneRepositoryUrl: z.string().trim().min(1).optional(),
       }),
     )
     .output(

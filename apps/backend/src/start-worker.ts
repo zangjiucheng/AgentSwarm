@@ -1,4 +1,5 @@
 import type Docker from "dockerode"
+import { posix as pathPosix } from "node:path"
 import {
   docker,
   getPreset,
@@ -8,17 +9,20 @@ import {
   WORKER_PRESET_LABEL,
   WORKER_TITLE_LABEL,
 } from "./worker-container"
-import { port } from "./config"
+import { config, port } from "./config"
 
 const SHARED_MEMORY_BYTES = 1024 * 1024 * 1024
 const MEMORY_LIMIT_BYTES = 8 * 1024 * 1024 * 1024
 const HEALTH_POLL_INTERVAL_MS = 1_000
 const HEALTH_TIMEOUT_MS = 60_000
+const WORKSPACE_ROOT = "/home/kasm-user/workers"
+const REPO_DIRECTORY_SANITIZER = /[^A-Za-z0-9._-]+/g
 
 type StartWorkerParams = {
   title: string
   preset: string
   env: Record<string, string>
+  cloneRepositoryUrl?: string
   labels?: Record<string, string>
 }
 
@@ -41,6 +45,28 @@ function assertRequiredEnv(
 
 function toContainerEnv(env: Record<string, string>) {
   return Object.entries(env).map(([key, value]) => `${key}=${value}`)
+}
+
+function normalizeCloneRepositoryUrl(cloneRepositoryUrl?: string) {
+  const trimmed = cloneRepositoryUrl?.trim()
+  return trimmed ? trimmed : undefined
+}
+
+function inferRepositoryDirectoryName(cloneRepositoryUrl: string) {
+  const withoutFragmentOrQuery = cloneRepositoryUrl
+    .replace(/[?#].*$/, "")
+    .replace(/\/+$/, "")
+  const lastSegment = withoutFragmentOrQuery.split(/[/:]/).pop() ?? ""
+  const directoryName = lastSegment
+    .replace(/\.git$/i, "")
+    .replace(REPO_DIRECTORY_SANITIZER, "-")
+    .replace(/^-+|-+$/g, "")
+
+  if (!directoryName) {
+    throw new Error("Could not derive a workspace directory from repository URL")
+  }
+
+  return directoryName
 }
 
 async function ensureImageAvailable(imageTag: string) {
@@ -99,15 +125,31 @@ export async function startWorkerContainer({
   title,
   preset,
   env,
+  cloneRepositoryUrl,
   labels,
 }: StartWorkerParams) {
   const selectedPreset = getPreset(preset)
-  const mergedEnv = {
-    ...(selfIp !== undefined
+  const normalizedCloneRepositoryUrl =
+    normalizeCloneRepositoryUrl(cloneRepositoryUrl)
+  const startupEnv: Record<string, string> = normalizedCloneRepositoryUrl
+    ? {
+        STARTUP_REPO_URL: normalizedCloneRepositoryUrl,
+        WORKSPACE_DIR: pathPosix.join(
+          WORKSPACE_ROOT,
+          inferRepositoryDirectoryName(normalizedCloneRepositoryUrl),
+        ),
+      }
+    : {}
+  const orchestratorEnv: Record<string, string> =
+    selfIp !== undefined
       ? { ORCHESTRATOR_ADDRESS: selfIp, ORCHESTRATOR_PORT: String(port) }
-      : {}),
+      : {}
+  const mergedEnv = {
+    ...orchestratorEnv,
     ...selectedPreset.presetEnv,
+    ...config.globalEnv,
     ...env,
+    ...startupEnv,
   }
 
   assertRequiredEnv(selectedPreset.requiredEnv, mergedEnv)
