@@ -94,7 +94,7 @@ export function WorkerSidebar({ presets, workers, hierarchy }: WorkerSidebarProp
         <div className="h-full rounded-lg bg-[#353535]">
           <div className="flex items-center justify-between px-4 py-4">
             <h1 className="text-default-600 text-xs font-semibold tracking-[0.4em] uppercase">
-              ClaudeSwarm
+              AgentSwarm
             </h1>
             <Button
               isIconOnly

@@ -43,7 +43,7 @@ type WorkerWorkspaceProps = {
   worker: WorkerInfo
 }
 
-type TerminalName = "claude" | "terminal"
+type TerminalName = "codex" | "terminal"
 
 const terminalSessions: Array<{
   command: string
@@ -51,9 +51,9 @@ const terminalSessions: Array<{
   value: TerminalName
 }> = [
   {
-    command: "tmux new-session -A -s claude",
-    label: "claude",
-    value: "claude",
+    command: "tmux new-session -A -s codex",
+    label: "codex",
+    value: "codex",
   },
   {
     command: "tmux new-session -A -s terminal",
@@ -70,7 +70,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 const terminalIcons: Record<TerminalName, typeof IconCode> = {
-  claude: IconCode,
+  codex: IconCode,
   terminal: IconTerminal2,
 }
 
@@ -81,21 +81,21 @@ export function WorkerWorkspace({
 }: WorkerWorkspaceProps) {
   const { id: workerId, port: workerPort } = worker
   const shellRef = useRef<HTMLDivElement | null>(null)
-  const claudeTerminalRef = useRef<WorkerTerminalHandle | null>(null)
+  const codexTerminalRef = useRef<WorkerTerminalHandle | null>(null)
   const terminalRef = useRef<WorkerTerminalHandle | null>(null)
   const [terminalHeight, setTerminalHeight] = useAtom(terminalHeightAtom)
   const [destroyModalOpen, setDestroyModalOpen] = useState(false)
   const [isDestroying, setIsDestroying] = useState(false)
   const [activeTerminal, setActiveTerminal] = useState<TerminalName>(() => {
     const storedTerminal = readStoredString(getTerminalSelectionKey(workerId))
-    return storedTerminal === "terminal" ? "terminal" : "claude"
+    return storedTerminal === "terminal" ? "terminal" : "codex"
   })
 
   const handleUploadPathReady = useCallback(
     (typedPaths: string[], targetTerminal: TerminalName) => {
       const terminalHandle =
-        targetTerminal === "claude"
-          ? claudeTerminalRef.current
+        targetTerminal === "codex"
+          ? codexTerminalRef.current
           : terminalRef.current
 
       if (typedPaths.length === 0) {
@@ -339,9 +339,7 @@ export function WorkerWorkspace({
                 key={session.value}
                 onPasteFiles={uploadFiles}
                 port={workerPort}
-                ref={
-                  session.value === "claude" ? claudeTerminalRef : terminalRef
-                }
+                ref={session.value === "codex" ? codexTerminalRef : terminalRef}
                 title={session.label}
               />
             ))}

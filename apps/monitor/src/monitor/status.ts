@@ -1,5 +1,6 @@
 import {
-  CLAUDE_SESSION_NAME,
+  AGENT_COMMANDS,
+  AGENT_SESSION_NAME,
   IDLE_COMMANDS,
   PR_TTL_MS,
 } from "./constants"
@@ -59,19 +60,19 @@ async function fetchPullRequest(fullPath: string) {
   }
 }
 
-async function readClaudePaneState() {
+async function readAgentPaneState() {
   const [commandResult, pathResult] = await Promise.all([
     runTmuxCommand([
       "list-panes",
       "-t",
-      CLAUDE_SESSION_NAME,
+      AGENT_SESSION_NAME,
       "-F",
       "#{pane_current_command}",
     ]),
     runTmuxCommand([
       "list-panes",
       "-t",
-      CLAUDE_SESSION_NAME,
+      AGENT_SESSION_NAME,
       "-F",
       "#{pane_current_path}",
     ]),
@@ -104,7 +105,7 @@ function shouldRefreshPullRequest(status: MonitorStatus, fullPath: string) {
 
 export async function getMonitorStatus(): Promise<MonitorInfo> {
   try {
-    const { currentCommand, fullPath } = await readClaudePaneState()
+    const { currentCommand, fullPath } = await readAgentPaneState()
 
     if (!currentCommand || IDLE_COMMANDS.has(currentCommand)) {
       resetPullRequestCache("idle", fullPath)
@@ -116,19 +117,28 @@ export async function getMonitorStatus(): Promise<MonitorInfo> {
 
     let status: MonitorStatus
 
-    if (currentCommand === "claude") {
+    if (AGENT_COMMANDS.has(currentCommand)) {
       const paneResult = await runTmuxCommand([
         "capture-pane",
         "-p",
         "-S",
         "0",
         "-t",
-        CLAUDE_SESSION_NAME,
+        AGENT_SESSION_NAME,
       ])
 
-      if (paneResult.stdout.includes("esc to interrupt") || paneResult.stdout.includes("(running)")) {
+      if (
+        paneResult.stdout.includes("esc to interrupt") ||
+        paneResult.stdout.includes("(running)") ||
+        paneResult.stdout.includes("Running") ||
+        paneResult.stdout.includes("Esc to interrupt")
+      ) {
         status = "working"
-      } else if (paneResult.stdout.includes("Type something.")) {
+      } else if (
+        paneResult.stdout.includes("Type something.") ||
+        paneResult.stdout.includes("OpenAI Codex") ||
+        paneResult.stdout.includes("Press Enter to submit")
+      ) {
         status = "waiting"
       } else {
         status = "idle"

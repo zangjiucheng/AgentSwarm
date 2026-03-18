@@ -260,6 +260,22 @@ function start_window_manager (){
 	else
 		echo "Skipping XFCE Startup"
 	fi
+        echo -e "\n------------------ i3 window manager startup------------------"
+        if [ "${START_DE}" == "i3" ] ; then
+		if [ -n "$KASM_ENABLE_ZINK" ] && [ -n "$KASM_EGL_CARD" ] && [ -n "$KASM_RENDERD" ]; then
+			echo "Starting i3 with Zink"
+			LIBGL_KOPPER_DRI2=1 MESA_LOADER_DRIVER_OVERRIDE=zink GALLIUM_DRIVER=zink DISPLAY=:1 /usr/bin/i3 &
+		elif [ -f /opt/VirtualGL/bin/vglrun ] && [ ! -z "${KASM_EGL_CARD}" ] && [ ! -z "${KASM_RENDERD}" ] && [ -O "${KASM_RENDERD}" ] && [ -O "${KASM_EGL_CARD}" ] ; then
+			echo "Starting i3 with VirtualGL using EGL device ${KASM_EGL_CARD}"
+			DISPLAY=:1 /opt/VirtualGL/bin/vglrun -d "${KASM_EGL_CARD}" /usr/bin/i3 &
+		else
+			echo "Starting i3"
+			DISPLAY=:1 /usr/bin/i3 &
+		fi
+		KASM_PROCS['window_manager']=$!
+	else
+		echo "Skipping i3 Startup"
+	fi
         echo -e "\n------------------ Openbox window manager startup------------------"
         if [ "${START_DE}" == "openbox" ] ; then
 		/usr/bin/openbox-session &

@@ -1,5 +1,5 @@
 {
-  "name": "claudeswarm-monorepo",
+  "name": "agentswarm-monorepo",
   "private": true,
   "packageManager": "bun@1.3.9",
   "workspaces": [
@@ -8,8 +8,10 @@
   "scripts": {
     "dev": "turbo run dev --parallel --continue",
     "build": "turbo run build",
+    "clean": "./clean.sh",
     "format": "prettier --write .",
-    "type-check-lint": "turbo run typecheck lint"
+    "type-check-lint": "turbo run typecheck lint",
+    "wrapup": "./wrapup.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9",

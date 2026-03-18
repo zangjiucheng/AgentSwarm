@@ -6,9 +6,9 @@ import { config } from "./config"
 export const docker = new Docker()
 
 export const WORKER_MONITOR_PORT = "51300/tcp"
-export const WORKER_PRESET_LABEL = "claudeswarm.preset"
-export const WORKER_TITLE_LABEL = "claudeswarm.title"
-export const WORKER_PARENT_LABEL = "claudeswarm.parent"
+export const WORKER_PRESET_LABEL = "agentswarm.preset"
+export const WORKER_TITLE_LABEL = "agentswarm.title"
+export const WORKER_PARENT_LABEL = "agentswarm.parent"
 const RENDER_DEVICE_STAT_IMAGE = "busybox"
 
 export let renderDeviceGroupId: number | undefined

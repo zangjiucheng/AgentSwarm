@@ -22,14 +22,12 @@ const defaultConfig: z.infer<typeof ConfigSchema> = {
   presets: [
     {
       name: "default",
-      imageTag: "pegasis0/claude-worker:latest",
+      imageTag: "agent-worker:latest",
       presetEnv: {},
       requiredEnv: [
-        "DISCORD_USER_ID",
-        "DISCORD_WEBHOOK_URL",
         "GITHUB_TOKEN",
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "CLAUDE_PROMPT",
+        "OPENAI_API_KEY",
+        "CODEX_PROMPT",
       ],
     },
   ],
@@ -54,10 +52,22 @@ const port = Number(readEnv("PORT", "3000"))
 const host = readEnv("HOST", "0.0.0.0")!
 const nodeEnv = readEnv("NODE_ENV", "development")
 const isProduction = nodeEnv === "production"
-const frontendDevServer = readEnv("FRONTEND_DEV_SERVER", "http://127.0.0.1:4100")!
+const frontendDevServer = readEnv(
+  "FRONTEND_DEV_SERVER",
+  "http://127.0.0.1:4100",
+)!
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
-const frontendDist = readEnv("FRONTEND_DIST") ?? resolve(currentDir, "../../frontend/dist")
+const frontendDist =
+  readEnv("FRONTEND_DIST") ?? resolve(currentDir, "../../frontend/dist")
 const frontendIndexPath = resolve(frontendDist, "index.html")
 
-export { config, port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath }
+export {
+  config,
+  port,
+  host,
+  isProduction,
+  frontendDevServer,
+  frontendDist,
+  frontendIndexPath,
+}

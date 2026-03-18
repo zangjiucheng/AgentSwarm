@@ -1,5 +1,5 @@
 import {
-  CLAUDE_SESSION_NAME,
+  AGENT_SESSION_NAME,
   MONITOR_FLAG_PATH,
   TERMINAL_SESSION_NAME,
 } from "./constants"
@@ -45,25 +45,39 @@ async function waitForMonitorFlagToDisappear() {
   }
 }
 
-async function launchClaudeSession() {
-  console.log("[monitor] running setup command in claude session")
-    await sendKeysToTmuxSession(
-      CLAUDE_SESSION_NAME,
-      ["source ~/setup.sh", "Enter"],
-      "SETUP_COMMAND",
-    )
+function getPrompt() {
+  return process.env.CODEX_PROMPT
+}
 
-  const claudePrompt = process.env.CLAUDE_PROMPT
-  let claudeCommand = `claude --dangerously-skip-permissions --allow-dangerously-skip-permissions --effort high${claudePrompt ? ` ${shellEscape(claudePrompt)}` : ""}`
+function getOneShotEnabled() {
+  return Boolean(process.env.CODEX_ONESHOT)
+}
 
-  if (process.env.CLAUDE_ONESHOT) {
-    claudeCommand = `${claudeCommand} -p | ~/orchestrator.py set-worker-output; ~/orchestrator.py destroy-worker`
+function buildAgentCommand() {
+  const prompt = getPrompt()
+  const promptArg = prompt ? ` ${shellEscape(prompt)}` : ""
+  const loginCommand =
+    'if [ -n "${OPENAI_API_KEY:-}" ]; then printenv OPENAI_API_KEY | codex login --with-api-key >/tmp/codex-login.log 2>&1 || { cat /tmp/codex-login.log; exit 1; }; fi'
+
+  if (getOneShotEnabled()) {
+    return `${loginCommand}; codex --search exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -o /tmp/codex-output.txt${promptArg}; status=$?; if [ -f /tmp/codex-output.txt ]; then cat /tmp/codex-output.txt | ~/orchestrator.py set-worker-output; fi; ~/orchestrator.py destroy-worker; exit $status`
   }
 
+  return `${loginCommand}; exec codex --dangerously-bypass-approvals-and-sandbox --search${promptArg}`
+}
+
+async function launchAgentSession() {
+  console.log("[monitor] running setup command in agent session")
   await sendKeysToTmuxSession(
-    CLAUDE_SESSION_NAME,
-    [claudeCommand, "Enter"],
-    "CLAUDE_PROMPT",
+    AGENT_SESSION_NAME,
+    ["source ~/setup.sh", "Enter"],
+    "SETUP_COMMAND",
+  )
+
+  await sendKeysToTmuxSession(
+    AGENT_SESSION_NAME,
+    [buildAgentCommand(), "Enter"],
+    "AGENT_START",
   )
 }
 
@@ -75,22 +89,23 @@ async function confirmTrustAndSyncTerminalSession() {
       "-S",
       "0",
       "-t",
-      CLAUDE_SESSION_NAME,
+      AGENT_SESSION_NAME,
     ])
 
     const paneOutput = result.stdout
     if (paneOutput.includes("Yes, I trust this folder")) {
       await sendKeysToTmuxSession(
-        CLAUDE_SESSION_NAME,
+        AGENT_SESSION_NAME,
         ["Enter"],
-        "CLAUDE_PROMPT_CONFIRM",
+        "AGENT_PROMPT_CONFIRM",
       )
       break
     }
 
     if (
       paneOutput.includes("Type something.") ||
-      paneOutput.includes("esc to interrupt")
+      paneOutput.includes("esc to interrupt") ||
+      paneOutput.includes("OpenAI Codex")
     ) {
       break
     }
@@ -101,7 +116,7 @@ async function confirmTrustAndSyncTerminalSession() {
   const pathResult = await runTmuxCommand([
     "list-panes",
     "-t",
-    CLAUDE_SESSION_NAME,
+    AGENT_SESSION_NAME,
     "-F",
     "#{pane_current_path}",
   ])
@@ -123,10 +138,10 @@ export async function initializeMonitor() {
     startupPromise = (async () => {
       await waitForMonitorFlagToDisappear()
       await Promise.all([
-        ensureTmuxSession(CLAUDE_SESSION_NAME),
+        ensureTmuxSession(AGENT_SESSION_NAME),
         ensureTmuxSession(TERMINAL_SESSION_NAME),
       ])
-      await launchClaudeSession()
+      await launchAgentSession()
       void confirmTrustAndSyncTerminalSession()
     })()
   }

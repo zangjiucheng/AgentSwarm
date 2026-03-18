@@ -3,19 +3,17 @@
   "presets": [
     {
       "name": "default",
-      "imageTag": "pegasis0/claude-worker:latest",
+      "imageTag": "agent-worker:latest",
       "presetEnv": {
-        "DISCORD_USER_ID": "591663117545635870",
-        "GIT_AUTHOR_NAME": "Pegasis's Claude Swarm",
-        "GIT_AUTHOR_EMAIL": "claude-swarm@pegasis.site",
-        "GIT_COMMITTER_NAME": "Pegasis's Claude Swarm",
-        "GIT_COMMITTER_EMAIL": "claude-swarm@pegasis.site"
+        "GIT_AUTHOR_NAME": "Pegasis's Agent Swarm",
+        "GIT_AUTHOR_EMAIL": "agent-swarm@pegasis.site",
+        "GIT_COMMITTER_NAME": "Pegasis's Agent Swarm",
+        "GIT_COMMITTER_EMAIL": "agent-swarm@pegasis.site"
       },
       "requiredEnv": [
-        "DISCORD_WEBHOOK_URL",
         "GITHUB_TOKEN",
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "CLAUDE_PROMPT"
+        "OPENAI_API_KEY",
+        "CODEX_PROMPT"
       ]
     }
   ]

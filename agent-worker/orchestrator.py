@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI to call ClaudeSwarm tRPC endpoints (no dependencies beyond stdlib)."""
+"""CLI to call AgentSwarm tRPC endpoints (no dependencies beyond stdlib)."""
 
 import argparse
 import json
@@ -15,10 +15,10 @@ def get_base_url():
     port = os.environ.get("ORCHESTRATOR_PORT", "14000")
     if orchestrator:
         url = f"http://{orchestrator}:{port}/api/trpc"
-        print(f"[claudeswarm] using {url}", file=sys.stderr)
+        print(f"[agentswarm] using {url}", file=sys.stderr)
         return url
     url = "http://localhost:14000/api/trpc"
-    print(f"[claudeswarm] ORCHESTRATOR_ADDRESS not set, using {url}", file=sys.stderr)
+    print(f"[agentswarm] ORCHESTRATOR_ADDRESS not set, using {url}", file=sys.stderr)
     return url
 
 
@@ -141,7 +141,7 @@ def cmd_get_worker_output(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ClaudeSwarm tRPC CLI")
+    parser = argparse.ArgumentParser(description="AgentSwarm tRPC CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("health", help="Check backend health")
