@@ -15,6 +15,7 @@ import {
 import { useState } from "react"
 import type { WorkerInfo } from "../lib/api-types"
 import { getWorkerIframeUrl } from "../lib/worker-urls"
+import { WorkerTerminalPanel } from "./worker-terminal-panel"
 
 type WorkerWorkspaceState = "active" | "cached" | "unloaded"
 
@@ -141,48 +142,56 @@ export function WorkerWorkspace({
           </Button>
         </div>
 
-        {hasWorkerPort && isReady ? (
-          <iframe
-            allow="clipboard-read; clipboard-write; fullscreen; self"
-            allowFullScreen
-            className="h-full w-full border-0 bg-[#282828]"
-            src={workerUrl}
-            title={`${worker.title} code-server`}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {hasWorkerPort && isReady ? (
+            <iframe
+              allow="clipboard-read; clipboard-write; fullscreen; self"
+              allowFullScreen
+              className="min-h-0 flex-1 border-0 bg-[#282828]"
+              src={workerUrl}
+              title={`${worker.title} code-server`}
+            />
+          ) : isStopped ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-[#282828] px-6">
+              <div className="max-w-md text-center">
+                <p className="text-default-300 text-sm font-medium">
+                  Worker is stopped
+                </p>
+                <p className="text-default-500 mt-2 text-xs">
+                  Start this worker to relaunch its code-server session and reopen
+                  the persisted workspace.
+                </p>
+                <Button
+                  className="mt-4"
+                  color="success"
+                  isLoading={isStarting}
+                  onPress={() => void onStartWorker(worker.id)}
+                  startContent={<IconPlayerPlay size={16} />}
+                >
+                  Start worker
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-[#282828] px-6">
+              <div className="max-w-md text-center">
+                <p className="text-default-300 text-sm font-medium">
+                  Worker is not ready
+                </p>
+                <p className="text-default-500 mt-2 text-xs">
+                  The code-server endpoint is unavailable. Check the worker logs
+                  or Docker Desktop for the startup failure.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <WorkerTerminalPanel
+            isReady={isReady}
+            isStopped={isStopped}
+            monitorPort={worker.monitorPort}
           />
-        ) : isStopped ? (
-          <div className="flex h-full items-center justify-center bg-[#282828] px-6">
-            <div className="max-w-md text-center">
-              <p className="text-default-300 text-sm font-medium">
-                Worker is stopped
-              </p>
-              <p className="text-default-500 mt-2 text-xs">
-                Start this worker to relaunch its code-server session and reopen
-                the persisted workspace.
-              </p>
-              <Button
-                className="mt-4"
-                color="success"
-                isLoading={isStarting}
-                onPress={() => void onStartWorker(worker.id)}
-                startContent={<IconPlayerPlay size={16} />}
-              >
-                Start worker
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex h-full items-center justify-center bg-[#282828] px-6">
-            <div className="max-w-md text-center">
-              <p className="text-default-300 text-sm font-medium">
-                Worker is not ready
-              </p>
-              <p className="text-default-500 mt-2 text-xs">
-                The code-server endpoint is unavailable. Check the worker logs
-                or Docker Desktop for the startup failure.
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
       </section>
     </>
   )

@@ -7,10 +7,29 @@ CONTAINER_NAME="${CONTAINER_NAME:-agentswarm}"
 IMAGE_TAG="${IMAGE_TAG:-agent-swarm:latest}"
 PORT="${PORT:-14000}"
 CONFIG_FILE="${CONFIG_FILE:-$ROOT_DIR/apps/backend/config.json}"
+CLEANUP_WORKERS=0
+
+while (($# > 0)); do
+  case "$1" in
+    --cleanup-workers)
+      CLEANUP_WORKERS=1
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      echo "Usage: $0 [--cleanup-workers]" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 cd "$ROOT_DIR"
 
-./build.sh
+if [ "$CLEANUP_WORKERS" -eq 1 ]; then
+  ./build.sh --cleanup-workers
+else
+  ./build.sh
+fi
 
 if command -v docker >/dev/null 2>&1; then
   existing_container_id="$(docker ps -aq --filter "name=^${CONTAINER_NAME}$" || true)"
@@ -37,3 +56,7 @@ DOCKER_ARGS+=("$IMAGE_TAG")
 docker "${DOCKER_ARGS[@]}"
 
 echo "AgentSwarm is running at http://localhost:$PORT"
+
+if [ "$CLEANUP_WORKERS" -eq 0 ]; then
+  echo "Existing worker containers were preserved."
+fi

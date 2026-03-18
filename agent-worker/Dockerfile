@@ -1,3 +1,16 @@
+FROM oven/bun:1 AS monitor-builder
+
+WORKDIR /app
+
+COPY package.json bun.lock /app/
+COPY apps/monitor/package.json /app/apps/monitor/package.json
+
+RUN bun install
+
+COPY apps/monitor /app/apps/monitor
+
+RUN bun build /app/apps/monitor/src/index.ts --outfile=/app/apps/monitor/dist/index.js --target bun --minify
+
 FROM nixos/nix:latest
 
 ENV HOME=/home/kasm-user
@@ -44,6 +57,7 @@ COPY --chown=1000:1000 agent-worker/tmux.conf /home/kasm-user/.tmux.conf
 COPY --chown=1000:1000 agent-worker/bashrc /home/kasm-user/.bashrc
 COPY --chown=1000:1000 agent-worker/setup.sh /home/kasm-user/setup.sh
 COPY --chown=1000:1000 agent-worker/orchestrator.py /home/kasm-user/orchestrator.py
+COPY --from=monitor-builder /app/apps/monitor/dist/index.js /usr/local/bin/monitor.js
 COPY agent-worker/docker-entrypoint.sh /usr/local/bin/agent-worker-entrypoint
 
 RUN chmod +x /home/kasm-user/orchestrator.py /usr/local/bin/agent-worker-entrypoint \

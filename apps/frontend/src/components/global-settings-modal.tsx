@@ -7,7 +7,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import type { GlobalSettings } from "../lib/api-types"
 import { trpc } from "../trpc"
 
@@ -23,10 +23,16 @@ export function GlobalSettingsModal({
   settings,
 }: GlobalSettingsModalProps) {
   const utils = trpc.useUtils()
+  const [githubUsernameDraft, setGithubUsernameDraft] = useState<string | null>(
+    null,
+  )
   const [githubToken, setGithubToken] = useState("")
+
+  const githubUsername = githubUsernameDraft ?? settings.githubUsername
 
   const saveGlobalSettings = trpc.saveGlobalSettings.useMutation({
     onSuccess: async () => {
+      setGithubUsernameDraft(null)
       setGithubToken("")
       await utils.globalSettings.invalidate()
       onOpenChange(false)
@@ -35,12 +41,20 @@ export function GlobalSettingsModal({
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
+      setGithubUsernameDraft(null)
       setGithubToken("")
       saveGlobalSettings.reset()
     }
 
     onOpenChange(open)
   }
+
+  const hasChanges = useMemo(() => {
+    return (
+      githubUsername.trim() !== settings.githubUsername ||
+      githubToken.trim().length > 0
+    )
+  }, [githubToken, githubUsername, settings.githubUsername])
 
   return (
     <Modal
@@ -56,6 +70,14 @@ export function GlobalSettingsModal({
             <ModalHeader>Global Settings</ModalHeader>
             <ModalBody className="gap-4">
               <Input
+                description="Used for GitHub HTTPS authentication when cloning repos with a personal access token."
+                label="GitHub Username"
+                onValueChange={setGithubUsernameDraft}
+                placeholder="your-github-handle"
+                value={githubUsername}
+              />
+
+              <Input
                 description="Applied to newly created workers and stored in backend config."
                 label="GitHub Token"
                 onValueChange={setGithubToken}
@@ -70,7 +92,7 @@ export function GlobalSettingsModal({
 
               <p className="text-default-400 text-sm">
                 Current status:{" "}
-                {settings.githubTokenConfigured ? "configured" : "not configured"}
+                {settings.githubTokenConfigured ? "token configured" : "token not configured"}
               </p>
 
               {saveGlobalSettings.error ? (
@@ -84,7 +106,12 @@ export function GlobalSettingsModal({
                 color="danger"
                 isDisabled={!settings.githubTokenConfigured}
                 isLoading={saveGlobalSettings.isPending}
-                onPress={() => saveGlobalSettings.mutate({ githubToken: null })}
+                onPress={() =>
+                  saveGlobalSettings.mutate({
+                    clearGithubToken: true,
+                    githubUsername: githubUsername.trim(),
+                  })
+                }
                 variant="light"
               >
                 Clear token
@@ -95,11 +122,14 @@ export function GlobalSettingsModal({
                 </Button>
                 <Button
                   color="primary"
-                  isDisabled={githubToken.trim().length === 0}
+                  isDisabled={!hasChanges}
                   isLoading={saveGlobalSettings.isPending}
                   onPress={() =>
                     saveGlobalSettings.mutate({
-                      githubToken: githubToken.trim(),
+                      ...(githubToken.trim()
+                        ? { githubToken: githubToken.trim() }
+                        : {}),
+                      githubUsername: githubUsername.trim(),
                     })
                   }
                   variant="flat"

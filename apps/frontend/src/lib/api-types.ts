@@ -1,6 +1,7 @@
 export type WorkerStatus = "ready" | "error" | "stopped"
 
 export type GlobalSettings = {
+  githubUsername: string
   githubTokenConfigured: boolean
 }
 
@@ -14,6 +15,7 @@ export type WorkerInfo = {
   id: string
   durationS: number
   port: number
+  monitorPort: number
   createdAt: number
   preset: string
   status: WorkerStatus

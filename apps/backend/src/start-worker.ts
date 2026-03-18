@@ -4,6 +4,7 @@ import {
   docker,
   getPreset,
   readPublishedPort,
+  WORKER_MONITOR_PORT,
   selfIp,
   WORKER_WEB_PORT,
   WORKER_PRESET_LABEL,
@@ -161,10 +162,12 @@ export async function startWorkerContainer({
     Env: toContainerEnv(mergedEnv),
     ExposedPorts: {
       [WORKER_WEB_PORT]: {},
+      [WORKER_MONITOR_PORT]: {},
     },
     HostConfig: {
       PortBindings: {
         [WORKER_WEB_PORT]: [{ HostPort: "" }],
+        [WORKER_MONITOR_PORT]: [{ HostPort: "" }],
       },
       ShmSize: SHARED_MEMORY_BYTES,
       Memory: MEMORY_LIMIT_BYTES,

@@ -11,9 +11,61 @@
         "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com"
       },
       "requiredEnv": []
+    },
+    {
+      "name": "frontend",
+      "imageTag": "agent-worker:latest",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng Frontend Swarm",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng Frontend Swarm",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "NODE_ENV": "development",
+        "BROWSER": "none"
+      },
+      "requiredEnv": []
+    },
+    {
+      "name": "fullstack",
+      "imageTag": "agent-worker:latest",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng Fullstack Swarm",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng Fullstack Swarm",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "NODE_ENV": "development"
+      },
+      "requiredEnv": []
+    },
+    {
+      "name": "oss-contrib",
+      "imageTag": "agent-worker:latest",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng OSS Swarm",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng OSS Swarm",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "GH_PROMPT_DISABLED": "1"
+      },
+      "requiredEnv": []
+    },
+    {
+      "name": "ai-agent",
+      "imageTag": "agent-worker:latest",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng AI Agent",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng AI Agent",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "NODE_ENV": "development"
+      },
+      "requiredEnv": [
+        "OPENAI_API_KEY"
+      ]
     }
   ],
   "globalEnv": {
-    "GITHUB_TOKEN": ""
+    "GITHUB_TOKEN": "",
+    "GITHUB_USERNAME": ""
   }
 }

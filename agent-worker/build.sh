@@ -5,6 +5,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$ROOT_DIR/.." && pwd)"
 IMAGE_TAG="${IMAGE_TAG:-agent-worker:latest}"
+CLEANUP_WORKERS=0
+
+while (($# > 0)); do
+  case "$1" in
+    --cleanup-workers)
+      CLEANUP_WORKERS=1
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      echo "Usage: $0 [--cleanup-workers]" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 cleanup_image() {
   local image_tag="$1"
@@ -22,6 +37,10 @@ cleanup_image() {
 
 prune_dangling_images() {
   docker image prune -f >/dev/null 2>&1 || true
+}
+
+prune_build_cache() {
+  docker builder prune -af >/dev/null 2>&1 || true
 }
 
 DOCKER_PLATFORMS="${DOCKER_PLATFORMS:-}"
@@ -42,7 +61,11 @@ if [ -n "$DOCKER_PLATFORMS" ]; then
   BUILD_ARGS+=(--platform "$DOCKER_PLATFORMS")
 fi
 
-cleanup_image "$IMAGE_TAG"
-prune_dangling_images
+if [ "$CLEANUP_WORKERS" -eq 1 ]; then
+  cleanup_image "$IMAGE_TAG"
+  prune_dangling_images
+fi
+
+prune_build_cache
 
 docker build "${BUILD_ARGS[@]}" -f "$ROOT_DIR/Dockerfile" -t "$IMAGE_TAG" "$REPO_DIR"

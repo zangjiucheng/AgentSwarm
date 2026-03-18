@@ -3,6 +3,7 @@ import {
   docker,
   getKnownPresetNames,
   readPublishedPort,
+  WORKER_MONITOR_PORT,
   WORKER_PARENT_LABEL,
   WORKER_PRESET_LABEL,
   WORKER_TITLE_LABEL,
@@ -16,6 +17,7 @@ export type WorkerInfo = {
   preset: string
   status: "ready" | "error" | "stopped"
   port: number
+  monitorPort: number
   durationS: number
   createdAt: number
 }
@@ -97,6 +99,7 @@ async function loadWorkers(): Promise<WorkersResult> {
     workerContainers.map(async (container) => {
       const inspection = await inspectWorkerContainer(container.Id)
       const port = readPublishedPort(inspection)
+      const monitorPort = readPublishedPort(inspection, WORKER_MONITOR_PORT)
       const monitorStatus = getContainerMonitorStatus(inspection)
 
       const parentId =
@@ -118,6 +121,7 @@ async function loadWorkers(): Promise<WorkersResult> {
             "unknown",
           status: monitorStatus.status,
           port: port ?? 0,
+          monitorPort: monitorPort ?? 0,
           durationS: getDurationS(inspection, container.Created),
           createdAt: container.Created,
         } satisfies WorkerInfo,

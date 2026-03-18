@@ -28,6 +28,7 @@ const workerSchema = z.object({
   preset: z.string(),
   status: workerStatusSchema,
   port: z.number(),
+  monitorPort: z.number(),
   durationS: z.number(),
   createdAt: z.number(),
 })
@@ -46,6 +47,7 @@ const presetsSchema = z.array(
 )
 
 const globalSettingsSchema = z.object({
+  githubUsername: z.string(),
   githubTokenConfigured: z.boolean(),
 })
 
@@ -70,28 +72,38 @@ export const appRouter = router({
     .output(globalSettingsSchema)
     .query(() => {
       return {
+        githubUsername: config.globalEnv.GITHUB_USERNAME ?? "",
         githubTokenConfigured: Boolean(config.globalEnv.GITHUB_TOKEN),
       }
     }),
   saveGlobalSettings: publicProcedure
     .input(
       z.object({
-        githubToken: z.string().trim().min(1).nullable(),
+        githubUsername: z.string().trim(),
+        githubToken: z.string().trim().min(1).optional(),
+        clearGithubToken: z.boolean().optional(),
       }),
     )
     .output(globalSettingsSchema)
     .mutation(({ input }) => {
       const nextGlobalEnv = { ...config.globalEnv }
 
-      if (input.githubToken) {
-        nextGlobalEnv.GITHUB_TOKEN = input.githubToken
+      if (input.githubUsername) {
+        nextGlobalEnv.GITHUB_USERNAME = input.githubUsername
       } else {
+        delete nextGlobalEnv.GITHUB_USERNAME
+      }
+
+      if (input.clearGithubToken) {
         delete nextGlobalEnv.GITHUB_TOKEN
+      } else if (input.githubToken) {
+        nextGlobalEnv.GITHUB_TOKEN = input.githubToken
       }
 
       setGlobalEnv(nextGlobalEnv)
 
       return {
+        githubUsername: nextGlobalEnv.GITHUB_USERNAME ?? "",
         githubTokenConfigured: Boolean(nextGlobalEnv.GITHUB_TOKEN),
       }
     }),

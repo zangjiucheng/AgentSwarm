@@ -5,6 +5,7 @@ import { config } from "./config"
 export const docker = new Docker()
 
 export const WORKER_WEB_PORT = "51300/tcp"
+export const WORKER_MONITOR_PORT = "51301/tcp"
 export const WORKER_PRESET_LABEL = "agentswarm.preset"
 export const WORKER_TITLE_LABEL = "agentswarm.title"
 export const WORKER_PARENT_LABEL = "agentswarm.parent"
@@ -63,9 +64,12 @@ function isManagedContainer(container: Docker.ContainerInfo) {
   return getKnownPresetNames().has(container.Labels?.[WORKER_PRESET_LABEL] ?? "")
 }
 
-export function readPublishedPort(container: Docker.ContainerInspectInfo) {
+export function readPublishedPort(
+  container: Docker.ContainerInspectInfo,
+  portDefinition = WORKER_WEB_PORT,
+) {
   const hostPort =
-    container.NetworkSettings.Ports?.[WORKER_WEB_PORT]?.[0]?.HostPort
+    container.NetworkSettings.Ports?.[portDefinition]?.[0]?.HostPort
 
   if (!hostPort) {
     return undefined

@@ -59,6 +59,7 @@ export function DashboardPage() {
   const hierarchy = workersQuery.data?.hierarchy ?? EMPTY_HIERARCHY
   const presets = presetsQuery.data ?? []
   const globalSettings = globalSettingsQuery.data ?? {
+    githubUsername: "",
     githubTokenConfigured: false,
   }
 
@@ -118,6 +119,9 @@ export function DashboardPage() {
       <div className="bg-background text-foreground flex min-h-screen">
         <WorkerSidebar
           globalSettings={globalSettings}
+          isDestroyingWorker={(id) =>
+            destroyWorker.isPending && destroyWorker.variables?.id === id
+          }
           isStartingWorker={(id) =>
             startExistingWorker.isPending &&
             startExistingWorker.variables?.id === id
@@ -125,6 +129,7 @@ export function DashboardPage() {
           isStoppingWorker={(id) =>
             stopWorker.isPending && stopWorker.variables?.id === id
           }
+          onDestroyWorker={handleDestroyWorker}
           onStartWorker={handleStartWorker}
           onStopWorker={handleStopWorker}
           presets={presets}

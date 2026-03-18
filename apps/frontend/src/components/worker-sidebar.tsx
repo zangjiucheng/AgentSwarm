@@ -1,5 +1,11 @@
 import { Button } from "@heroui/react"
-import { IconPlayerPause, IconPlayerPlay, IconPlus, IconSettings } from "@tabler/icons-react"
+import {
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconPlus,
+  IconSettings,
+  IconTrash,
+} from "@tabler/icons-react"
 import { useState } from "react"
 import { Link, useParams } from "react-router"
 import type { GlobalSettings, PresetInfo, WorkerInfo } from "../lib/api-types"
@@ -10,8 +16,10 @@ import { GlobalSettingsModal } from "./global-settings-modal"
 
 type WorkerSidebarProps = {
   globalSettings: GlobalSettings
+  isDestroyingWorker: (id: string) => boolean
   isStartingWorker: (id: string) => boolean
   isStoppingWorker: (id: string) => boolean
+  onDestroyWorker: (id: string) => Promise<void>
   onStartWorker: (id: string) => Promise<void>
   onStopWorker: (id: string) => Promise<void>
   presets: PresetInfo[]
@@ -20,43 +28,66 @@ type WorkerSidebarProps = {
 }
 
 type WorkerListItemProps = {
+  isDestroying: boolean
   worker: WorkerInfo
   isStarting: boolean
   isStopping: boolean
+  onDestroyWorker: (id: string) => Promise<void>
   onStartWorker: (id: string) => Promise<void>
   onStopWorker: (id: string) => Promise<void>
 }
 
-function WorkerLifecycleButton({
+function WorkerControls({
+  isDestroying,
   worker,
   isStarting,
   isStopping,
+  onDestroyWorker,
   onStartWorker,
   onStopWorker,
 }: WorkerListItemProps) {
   const isStopped = worker.status === "stopped"
 
   return (
-    <Button
-      className="mt-3 shrink-0 self-start"
-      color={isStopped ? "success" : "default"}
-      isIconOnly
-      isLoading={isStarting || isStopping}
-      onPress={() =>
-        void (isStopped ? onStartWorker(worker.id) : onStopWorker(worker.id))
-      }
-      size="sm"
-      variant="light"
-    >
-      {isStopped ? <IconPlayerPlay size={16} /> : <IconPlayerPause size={16} />}
-    </Button>
+    <div className="mt-3 flex shrink-0 items-center gap-1 self-start">
+      <Button
+        color={isStopped ? "success" : "default"}
+        isIconOnly
+        isLoading={isStarting || isStopping}
+        onPress={() =>
+          void (isStopped ? onStartWorker(worker.id) : onStopWorker(worker.id))
+        }
+        size="sm"
+        variant="light"
+      >
+        {isStopped ? <IconPlayerPlay size={16} /> : <IconPlayerPause size={16} />}
+      </Button>
+      <Button
+        color="danger"
+        isIconOnly
+        isLoading={isDestroying}
+        onPress={() => {
+          if (!window.confirm(`Destroy "${worker.title}"?`)) {
+            return
+          }
+
+          void onDestroyWorker(worker.id)
+        }}
+        size="sm"
+        variant="light"
+      >
+        <IconTrash size={16} />
+      </Button>
+    </div>
   )
 }
 
 function WorkerItem({
+  isDestroying,
   worker,
   isStarting,
   isStopping,
+  onDestroyWorker,
   onStartWorker,
   onStopWorker,
 }: WorkerListItemProps) {
@@ -84,10 +115,12 @@ function WorkerItem({
         </p>
         <p className="mt-2 text-base text-wrap">{worker.title}</p>
       </Button>
-      <WorkerLifecycleButton
+      <WorkerControls
+        isDestroying={isDestroying}
         worker={worker}
         isStarting={isStarting}
         isStopping={isStopping}
+        onDestroyWorker={onDestroyWorker}
         onStartWorker={onStartWorker}
         onStopWorker={onStopWorker}
       />
@@ -96,9 +129,11 @@ function WorkerItem({
 }
 
 function SubWorkerItem({
+  isDestroying,
   worker,
   isStarting,
   isStopping,
+  onDestroyWorker,
   onStartWorker,
   onStopWorker,
 }: WorkerListItemProps) {
@@ -126,10 +161,12 @@ function SubWorkerItem({
         </p>
         <p className="mt-1 text-sm text-wrap">{worker.title}</p>
       </Button>
-      <WorkerLifecycleButton
+      <WorkerControls
+        isDestroying={isDestroying}
         worker={worker}
         isStarting={isStarting}
         isStopping={isStopping}
+        onDestroyWorker={onDestroyWorker}
         onStartWorker={onStartWorker}
         onStopWorker={onStopWorker}
       />
@@ -139,8 +176,10 @@ function SubWorkerItem({
 
 export function WorkerSidebar({
   globalSettings,
+  isDestroyingWorker,
   isStartingWorker,
   isStoppingWorker,
+  onDestroyWorker,
   onStartWorker,
   onStopWorker,
   presets,
@@ -194,8 +233,10 @@ export function WorkerSidebar({
                 return (
                   <div key={worker.id}>
                     <WorkerItem
+                      isDestroying={isDestroyingWorker(worker.id)}
                       isStarting={isStartingWorker(worker.id)}
                       isStopping={isStoppingWorker(worker.id)}
+                      onDestroyWorker={onDestroyWorker}
                       onStartWorker={onStartWorker}
                       onStopWorker={onStopWorker}
                       worker={worker}
@@ -203,8 +244,10 @@ export function WorkerSidebar({
                     {children.map((child) => (
                       <SubWorkerItem
                         key={child.id}
+                        isDestroying={isDestroyingWorker(child.id)}
                         isStarting={isStartingWorker(child.id)}
                         isStopping={isStoppingWorker(child.id)}
+                        onDestroyWorker={onDestroyWorker}
                         onStartWorker={onStartWorker}
                         onStopWorker={onStopWorker}
                         worker={child}

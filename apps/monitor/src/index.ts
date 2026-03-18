@@ -14,8 +14,8 @@ import {
 } from "./monitor"
 import { handleUploadRequest } from "./monitor/upload"
 
-const PORT = 51301
-const HOST = "0.0.0.0"
+const PORT = Number.parseInt(process.env.MONITOR_PORT ?? "51301", 10)
+const HOST = process.env.MONITOR_HOST ?? "0.0.0.0"
 
 type MonitorSocketData = {
   command: TerminalCommand

@@ -31,6 +31,7 @@
           name = "agentswarm-worker-env";
           paths = with pkgs; [
             bashInteractive
+            bun
             cacert
             code-server
             coreutils
@@ -44,6 +45,7 @@
             gnused
             iptables
             nodejs_22
+            openssh
             procps
             python3
             ripgrep
