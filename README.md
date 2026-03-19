@@ -5,21 +5,41 @@
 
 ## Run
 
-Build the images:
+### Remote Images
 
 ```bash
-./build.sh
+./run.sh --remote-images
 ```
 
-Or build and start everything in one step:
+Recommended for normal use. This pulls `ghcr.io/zangjiucheng/agentswarm:latest` for the app and rewrites the mounted config so new workers use `ghcr.io/zangjiucheng/agentswarm-worker:latest`.
+
+If you run this on a non-default git branch, `run.sh` first tries the matching branch tag in GHCR before falling back to `latest`.
+
+Pin a specific published image:
+
+```bash
+IMAGE_TAG=ghcr.io/zangjiucheng/agentswarm:sha-<commit> \
+WORKER_IMAGE_TAG=ghcr.io/zangjiucheng/agentswarm-worker:sha-<commit> \
+./run.sh --remote-images
+```
+
+GitHub Actions builds both images on every push. Pushes publish multi-arch images to `ghcr.io/zangjiucheng/agentswarm` and `ghcr.io/zangjiucheng/agentswarm-worker`. Pull requests run the same builds without publishing.
+
+### Local Build
+
+For local development:
 
 ```bash
 ./run.sh
 ```
 
-GitHub Actions now builds both Docker images on every push. Pushes to the repository publish multi-arch images to `ghcr.io/zangjiucheng/agentswarm` and `ghcr.io/zangjiucheng/agentswarm-worker`. Pull requests run the same builds without publishing.
+If you only want to build:
 
-By default, `./run.sh` preserves existing worker containers. If you explicitly want to remove existing workers before rebuilding the worker image, use:
+```bash
+./build.sh
+```
+
+To rebuild workers from scratch:
 
 ```bash
 ./run.sh --cleanup-workers
@@ -29,7 +49,9 @@ Build scripts now prune Docker build cache before each build to keep local disk 
 
 On Apple Silicon macOS, the build defaults to `linux/arm64`. If needed, override `DOCKER_PLATFORMS` with a single platform such as `linux/amd64` or `linux/arm64`.
 
-Start the app:
+### Manual Docker
+
+Run the published app image directly:
 
 ```bash
 docker run -d \
@@ -39,15 +61,17 @@ docker run -d \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v agentswarm-data:/app/data \
   -v "$(pwd)/apps/backend/config.json:/app/config.json" \
-  agent-swarm:latest
+  ghcr.io/zangjiucheng/agentswarm:latest
 ```
 
 Then open `http://localhost:14000`.
 
+### Notes
+
 The runtime image already includes a default config, so mounting [`/apps/backend/config.json`](./apps/backend/config.json) is optional unless you want to override it.
 The backend secret store is persisted under `/app/data`, so keep that path on a Docker volume if you want GitHub accounts and other stored settings to survive container rebuilds.
 
-When you create a worker from the UI, the default image tag is `agent-worker:latest`. The required env vars are:
+When you create a worker from the UI, the worker image comes from the active config. `./run.sh --remote-images` points presets to `ghcr.io/zangjiucheng/agentswarm-worker:latest`, while local builds use `agent-worker:latest`. The required env vars are:
 
 - none by default
 
