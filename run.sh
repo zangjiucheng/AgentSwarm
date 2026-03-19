@@ -15,10 +15,6 @@ REMOTE_WORKER_IMAGE_TAG="${REMOTE_WORKER_IMAGE_TAG:-ghcr.io/zangjiucheng/agentsw
 GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-$ROOT_DIR/.agentswarm}"
 TMP_CONFIG_FILE=""
 
-get_current_branch() {
-  git branch --show-current 2>/dev/null || true
-}
-
 get_default_branch() {
   local ref
   ref="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
@@ -77,22 +73,13 @@ if [ "$USE_REMOTE_IMAGES" -eq 1 ]; then
   remote_worker_image_repo="${REMOTE_WORKER_IMAGE_TAG%:*}"
   remote_image_default_tag="${REMOTE_IMAGE_TAG##*:}"
   remote_worker_image_default_tag="${REMOTE_WORKER_IMAGE_TAG##*:}"
-  current_branch="$(get_current_branch)"
   default_branch="$(get_default_branch)"
 
   if [ "$IMAGE_TAG" = "agent-swarm:latest" ]; then
-    if [ -n "$current_branch" ] && [ "$current_branch" != "$default_branch" ]; then
-      IMAGE_TAG="$(pull_first_available_image \
-        "$remote_image_repo" \
-        "$current_branch" \
-        "$default_branch" \
-        "$remote_image_default_tag")"
-    else
-      IMAGE_TAG="$(pull_first_available_image \
-        "$remote_image_repo" \
-        "$remote_image_default_tag" \
-        "$default_branch")"
-    fi
+    IMAGE_TAG="$(pull_first_available_image \
+      "$remote_image_repo" \
+      "$remote_image_default_tag" \
+      "$default_branch")"
   fi
 
   if [ "$WORKER_IMAGE_TAG" = "agent-worker:latest" ]; then

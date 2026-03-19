@@ -13,8 +13,6 @@
 
 Recommended for normal use. This pulls `ghcr.io/zangjiucheng/agentswarm:latest` for the app and rewrites the mounted config so new workers use `ghcr.io/zangjiucheng/agentswarm-worker:latest`.
 
-If you run this on a non-default git branch, `run.sh` first tries the matching branch tag in GHCR before falling back to `latest`.
-
 Pin a specific published image:
 
 ```bash
@@ -23,7 +21,7 @@ WORKER_IMAGE_TAG=ghcr.io/zangjiucheng/agentswarm-worker:sha-<commit> \
 ./run.sh --remote-images
 ```
 
-GitHub Actions builds both images on every push. Pushes publish multi-arch images to `ghcr.io/zangjiucheng/agentswarm` and `ghcr.io/zangjiucheng/agentswarm-worker`. Pull requests run the same builds without publishing.
+GitHub Actions builds both images only when new commits land on `main`. In-progress older runs are canceled automatically when a newer commit is pushed to `main`. Successful runs publish multi-arch images to `ghcr.io/zangjiucheng/agentswarm` and `ghcr.io/zangjiucheng/agentswarm-worker`.
 
 ### Local Build
 

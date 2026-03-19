@@ -3,13 +3,10 @@ name: Docker
 on:
   push:
     branches:
-      - "**"
-    tags:
-      - "v*"
-  pull_request:
+      - main
 
 concurrency:
-  group: docker-${{ github.ref }}
+  group: docker-main
   cancel-in-progress: true
 
 permissions:
@@ -47,7 +44,6 @@ jobs:
         run: echo "owner=${OWNER,,}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -61,8 +57,6 @@ jobs:
           images: ghcr.io/${{ steps.repo.outputs.owner }}/${{ matrix.image }}
           tags: |
             type=ref,event=branch
-            type=ref,event=tag
-            type=ref,event=pr
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
@@ -72,7 +66,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
