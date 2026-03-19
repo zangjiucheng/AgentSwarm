@@ -28,6 +28,7 @@ const TERMINAL_TAB_CONFIG: Record<TerminalTab, { command: string; label: string 
 const DEFAULT_PANEL_HEIGHT = 288
 const MIN_PANEL_HEIGHT = 180
 const MAX_PANEL_HEIGHT_RATIO = 0.7
+const PANEL_HEIGHT_STEP = 8
 
 function parseMonitorMessage(rawMessage: string) {
   try {
@@ -39,6 +40,10 @@ function parseMonitorMessage(rawMessage: string) {
   }
 }
 
+function snapPanelHeight(height: number) {
+  return Math.round(height / PANEL_HEIGHT_STEP) * PANEL_HEIGHT_STEP
+}
+
 export function WorkerTerminalPanel({
   isReady,
   isStopped,
@@ -46,12 +51,11 @@ export function WorkerTerminalPanel({
 }: WorkerTerminalPanelProps) {
   const [activeTab, setActiveTab] = useState<TerminalTab>("terminal")
   const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT)
-  const panelRef = useRef<HTMLElement | null>(null)
   const terminalHostRef = useRef<HTMLDivElement | null>(null)
   const panelHeightRef = useRef(DEFAULT_PANEL_HEIGHT)
-  const dragStateRef = useRef<{ startHeight: number; startY: number } | null>(
-    null,
-  )
+  const previewHeightRef = useRef(DEFAULT_PANEL_HEIGHT)
+  const dragStateRef = useRef<{ startHeight: number; startY: number } | null>(null)
+  const previewLineRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number | null>(null)
   const panelCommand = useMemo(
     () => TERMINAL_TAB_CONFIG[activeTab].command,
@@ -63,28 +67,31 @@ export function WorkerTerminalPanel({
   }, [panelHeight])
 
   useEffect(() => {
-    const panelElement = panelRef.current
+    const calculateNextHeight = (dragState: {
+      startHeight: number
+      startY: number
+    }, clientY: number) => {
+      const maxPanelHeight = Math.floor(window.innerHeight * MAX_PANEL_HEIGHT_RATIO)
+      const nextHeight = dragState.startHeight + (dragState.startY - clientY)
 
-    if (!panelElement) {
-      return
+      return snapPanelHeight(
+        Math.max(MIN_PANEL_HEIGHT, Math.min(maxPanelHeight, nextHeight)),
+      )
     }
 
-    panelElement.style.height = `${panelHeight}px`
-  }, [panelHeight])
-
-  useEffect(() => {
-    const applyPanelHeight = (nextHeight: number) => {
-      panelHeightRef.current = nextHeight
+    const applyPreviewHeight = (nextHeight: number) => {
+      previewHeightRef.current = nextHeight
 
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
       }
 
       rafRef.current = window.requestAnimationFrame(() => {
-        const panelElement = panelRef.current
+        const previewLineElement = previewLineRef.current
 
-        if (panelElement) {
-          panelElement.style.height = `${nextHeight}px`
+        if (previewLineElement) {
+          previewLineElement.style.opacity = "1"
+          previewLineElement.style.bottom = `${nextHeight}px`
         }
 
         rafRef.current = null
@@ -98,31 +105,46 @@ export function WorkerTerminalPanel({
         return
       }
 
-      const maxPanelHeight = Math.floor(window.innerHeight * MAX_PANEL_HEIGHT_RATIO)
-      const nextHeight = dragState.startHeight + (dragState.startY - event.clientY)
-
-      applyPanelHeight(
-        Math.max(MIN_PANEL_HEIGHT, Math.min(maxPanelHeight, nextHeight)),
-      )
+      applyPreviewHeight(calculateNextHeight(dragState, event.clientY))
     }
 
-    const handlePointerUp = () => {
-      if (!dragStateRef.current) {
+    const finishDrag = (clientY?: number) => {
+      const dragState = dragStateRef.current
+
+      if (!dragState) {
         return
+      }
+
+      if (typeof clientY === "number") {
+        previewHeightRef.current = calculateNextHeight(dragState, clientY)
       }
 
       dragStateRef.current = null
       document.body.style.cursor = ""
       document.body.style.userSelect = ""
-      setPanelHeight(panelHeightRef.current)
+      if (previewLineRef.current) {
+        previewLineRef.current.style.opacity = "0"
+      }
+      panelHeightRef.current = previewHeightRef.current
+      setPanelHeight(previewHeightRef.current)
+    }
+
+    const handlePointerUp = (event: PointerEvent) => {
+      finishDrag(event.clientY)
+    }
+
+    const handlePointerCancel = () => {
+      finishDrag()
     }
 
     window.addEventListener("pointermove", handlePointerMove)
     window.addEventListener("pointerup", handlePointerUp)
+    window.addEventListener("pointercancel", handlePointerCancel)
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove)
       window.removeEventListener("pointerup", handlePointerUp)
+      window.removeEventListener("pointercancel", handlePointerCancel)
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
@@ -133,6 +155,9 @@ export function WorkerTerminalPanel({
   }, [])
 
   const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    previewHeightRef.current = panelHeightRef.current
     dragStateRef.current = {
       startHeight: panelHeightRef.current,
       startY: event.clientY,
@@ -169,21 +194,29 @@ export function WorkerTerminalPanel({
     const socket = new WebSocket(
       getWorkerMonitorWebSocketUrl(monitorPort, panelCommand),
     )
+    let resizeFrame: number | null = null
 
     const sendResize = () => {
-      fitAddon.fit()
-
-      if (socket.readyState !== WebSocket.OPEN) {
+      if (resizeFrame !== null) {
         return
       }
 
-      socket.send(
-        JSON.stringify({
-          type: "resize",
-          cols: term.cols,
-          rows: term.rows,
-        }),
-      )
+      resizeFrame = window.requestAnimationFrame(() => {
+        resizeFrame = null
+        fitAddon.fit()
+
+        if (socket.readyState !== WebSocket.OPEN) {
+          return
+        }
+
+        socket.send(
+          JSON.stringify({
+            type: "resize",
+            cols: term.cols,
+            rows: term.rows,
+          }),
+        )
+      })
     }
 
     socket.addEventListener("open", sendResize)
@@ -226,6 +259,9 @@ export function WorkerTerminalPanel({
     sendResize()
 
     return () => {
+      if (resizeFrame !== null) {
+        cancelAnimationFrame(resizeFrame)
+      }
       resizeObserver.disconnect()
       dataDisposable.dispose()
       socket.close()
@@ -234,11 +270,15 @@ export function WorkerTerminalPanel({
   }, [isReady, monitorPort, panelCommand])
 
   return (
-    <section
-      className="flex shrink-0 flex-col border-t border-gray-700 bg-[#1b1b1b]"
-      ref={panelRef}
-      style={{ height: `${panelHeight}px` }}
-    >
+    <>
+      <div
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 h-0.5 bg-white/25 opacity-0"
+        ref={previewLineRef}
+      />
+      <section
+        className="flex shrink-0 flex-col border-t border-gray-700 bg-[#1b1b1b]"
+        style={{ height: `${panelHeight}px` }}
+      >
       <div
         className="group flex h-3 shrink-0 cursor-row-resize items-center justify-center bg-[#181818]"
         onPointerDown={handleResizeStart}
@@ -293,6 +333,7 @@ export function WorkerTerminalPanel({
           </div>
         </div>
       )}
-    </section>
+      </section>
+    </>
   )
 }
