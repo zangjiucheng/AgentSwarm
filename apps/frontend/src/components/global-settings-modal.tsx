@@ -7,7 +7,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { GlobalSettings } from "../lib/api-types"
 import { trpc } from "../trpc"
 
@@ -24,6 +24,7 @@ export function GlobalSettingsModal({
 }: GlobalSettingsModalProps) {
   const utils = trpc.useUtils()
   const [accountName, setAccountName] = useState("")
+  const [autoPauseMinutes, setAutoPauseMinutes] = useState("")
   const [githubUsername, setGithubUsername] = useState("")
   const [githubToken, setGithubToken] = useState("")
 
@@ -43,6 +44,10 @@ export function GlobalSettingsModal({
     },
   })
 
+  const saveGlobalSettings = trpc.saveGlobalSettings.useMutation({
+    onSuccess: refreshQueries,
+  })
+
   const deleteGithubAccount = trpc.deleteGithubAccount.useMutation({
     onSuccess: refreshQueries,
   })
@@ -53,12 +58,26 @@ export function GlobalSettingsModal({
 
   const resetState = () => {
     setAccountName("")
+    setAutoPauseMinutes(
+      settings.autoPauseMinutes == null ? "" : String(settings.autoPauseMinutes),
+    )
     setGithubUsername("")
     setGithubToken("")
+    saveGlobalSettings.reset()
     saveGithubAccount.reset()
     deleteGithubAccount.reset()
     setDefaultGithubAccount.reset()
   }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    setAutoPauseMinutes(
+      settings.autoPauseMinutes == null ? "" : String(settings.autoPauseMinutes),
+    )
+  }, [isOpen, settings.autoPauseMinutes])
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -76,7 +95,21 @@ export function GlobalSettingsModal({
     )
   }, [accountName, githubToken, githubUsername])
 
+  const parsedAutoPauseMinutes = autoPauseMinutes.trim()
+    ? Number.parseInt(autoPauseMinutes.trim(), 10)
+    : null
+  const normalizedAutoPauseMinutes =
+    parsedAutoPauseMinutes == null || parsedAutoPauseMinutes <= 0
+      ? null
+      : parsedAutoPauseMinutes
+  const autoPauseInputValid =
+    parsedAutoPauseMinutes === null ||
+    (Number.isInteger(parsedAutoPauseMinutes) && parsedAutoPauseMinutes >= 0)
+  const autoPauseChanged =
+    (settings.autoPauseMinutes ?? null) !== normalizedAutoPauseMinutes
+
   const errorMessage =
+    saveGlobalSettings.error?.message ??
     saveGithubAccount.error?.message ??
     deleteGithubAccount.error?.message ??
     setDefaultGithubAccount.error?.message
@@ -94,6 +127,25 @@ export function GlobalSettingsModal({
           <>
             <ModalHeader>GitHub Accounts</ModalHeader>
             <ModalBody className="gap-5">
+              <div className="space-y-4 rounded-lg border border-default-200 px-4 py-4">
+                <p className="text-sm font-medium text-default-700">
+                  Worker auto-pause
+                </p>
+                <Input
+                  description="Automatically pause running workers after this many minutes. Leave empty or set 0 to disable."
+                  endContent={
+                    <span className="text-default-400 text-xs">minutes</span>
+                  }
+                  isInvalid={!autoPauseInputValid}
+                  label="Auto-pause after"
+                  min={0}
+                  onValueChange={setAutoPauseMinutes}
+                  placeholder="Disabled"
+                  type="number"
+                  value={autoPauseMinutes}
+                />
+              </div>
+
               <div className="space-y-3">
                 {settings.githubAccounts.length > 0 ? (
                   settings.githubAccounts.map((account) => {
@@ -196,11 +248,24 @@ export function GlobalSettingsModal({
             </ModalBody>
             <ModalFooter className="justify-between">
               <p className="text-default-400 text-xs">
-                These accounts are stored in the backend secret store and survive worker rebuilds.
+                Auto-pause is based on worker runtime after start, not keyboard or terminal activity.
               </p>
               <div className="flex gap-2">
                 <Button onPress={close} variant="light">
                   Close
+                </Button>
+                <Button
+                  color="primary"
+                  isDisabled={!autoPauseInputValid || !autoPauseChanged}
+                  isLoading={saveGlobalSettings.isPending}
+                  onPress={() =>
+                    saveGlobalSettings.mutate({
+                      autoPauseMinutes: normalizedAutoPauseMinutes,
+                    })
+                  }
+                  variant="flat"
+                >
+                  Save settings
                 </Button>
                 <Button
                   color="primary"

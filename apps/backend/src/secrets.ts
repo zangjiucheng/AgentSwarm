@@ -12,6 +12,7 @@ const GithubAccountSchema = z.object({
 })
 
 const SecretStoreSchema = z.object({
+  autoPauseMinutes: z.number().int().nonnegative().nullable().default(null),
   defaultGithubAccountId: z.string().default(""),
   githubAccounts: z.array(GithubAccountSchema).default([]),
   githubToken: z.string().default(""),
@@ -46,6 +47,10 @@ function toPublicGithubAccount(account: GithubAccount): GithubAccountPublic {
 function normalizeSecretStore(store: SecretStore): SecretStore {
   const githubAccounts = [...store.githubAccounts]
   const seenIds = new Set(githubAccounts.map((account) => account.id))
+  const autoPauseMinutes =
+    store.autoPauseMinutes == null || store.autoPauseMinutes <= 0
+      ? null
+      : store.autoPauseMinutes
 
   if (githubAccounts.length === 0 && store.githubToken.trim().length > 0) {
     const legacyId = "legacy-default"
@@ -69,6 +74,7 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
     : githubAccounts[0]?.id ?? ""
 
   return {
+    autoPauseMinutes,
     defaultGithubAccountId,
     githubAccounts,
     githubToken: "",
@@ -145,6 +151,7 @@ export function getGlobalSettings() {
   const defaultAccount = getDefaultGithubAccount()
 
   return {
+    autoPauseMinutes: secretStore.autoPauseMinutes,
     defaultGithubAccountId: defaultAccount?.id ?? null,
     githubAccounts: secretStore.githubAccounts.map(toPublicGithubAccount),
     githubTokenConfigured: secretStore.githubAccounts.length > 0,
@@ -188,11 +195,20 @@ export function saveGithubAccount(input: {
 }
 
 export function saveGlobalSettings(input: {
-  githubUsername: string
+  autoPauseMinutes?: number | null
+  githubUsername?: string
   githubToken?: string
   clearGithubToken?: boolean
 }) {
+  const nextSecretStore = normalizeSecretStore({
+    ...secretStore,
+    autoPauseMinutes:
+      input.autoPauseMinutes === undefined ? secretStore.autoPauseMinutes : input.autoPauseMinutes,
+  })
+  persistSecretStore(nextSecretStore)
+
   const defaultAccount = getDefaultGithubAccount()
+  const githubUsername = input.githubUsername?.trim() ?? ""
 
   if (input.clearGithubToken) {
     if (defaultAccount) {
@@ -207,23 +223,27 @@ export function saveGlobalSettings(input: {
       id: defaultAccount?.id,
       name:
         defaultAccount?.name ||
-        input.githubUsername.trim() ||
+        githubUsername ||
         "Default GitHub account",
       token: input.githubToken,
-      username: input.githubUsername,
+      username: githubUsername,
     })
   }
 
-  if (defaultAccount && input.githubUsername.trim()) {
+  if (defaultAccount && githubUsername) {
     return saveGithubAccount({
       id: defaultAccount.id,
       name: defaultAccount.name,
       token: defaultAccount.token,
-      username: input.githubUsername,
+      username: githubUsername,
     })
   }
 
   return getGlobalSettings()
+}
+
+export function getAutoPauseMinutes() {
+  return secretStore.autoPauseMinutes
 }
 
 export function deleteGithubAccount(accountId: string) {

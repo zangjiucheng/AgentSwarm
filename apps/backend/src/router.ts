@@ -69,6 +69,7 @@ const presetsSchema = z.array(
 )
 
 const globalSettingsSchema = z.object({
+  autoPauseMinutes: z.number().int().positive().nullable(),
   defaultGithubAccountId: z.string().nullable(),
   githubAccounts: z.array(
     z.object({
@@ -106,7 +107,8 @@ export const appRouter = router({
   saveGlobalSettings: publicProcedure
     .input(
       z.object({
-        githubUsername: z.string().trim(),
+        autoPauseMinutes: z.number().int().positive().nullable().optional(),
+        githubUsername: z.string().trim().optional(),
         githubToken: z.string().trim().min(1).optional(),
         clearGithubToken: z.boolean().optional(),
       }),

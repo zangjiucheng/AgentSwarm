@@ -2,6 +2,7 @@ import { createBunServeHandler } from "trpc-bun-adapter"
 import { resolve } from "node:path"
 import { port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath } from "./config"
 import { appRouter, type TRPCContext } from "./router"
+import { initializeAutoPauseScheduler } from "./auto-pause"
 import { initializeWorkerContainerRuntime, selfIp } from "./worker-container"
 
 const requestIpMap = new WeakMap<Request, string>()
@@ -77,6 +78,7 @@ async function handleFallback(request: Request) {
 }
 
 await initializeWorkerContainerRuntime()
+initializeAutoPauseScheduler()
 
 const handler = createBunServeHandler(
   {

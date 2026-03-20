@@ -7,6 +7,7 @@ export type GithubAccount = {
 export type WorkerStatus = "ready" | "error" | "stopped"
 
 export type GlobalSettings = {
+  autoPauseMinutes: number | null
   defaultGithubAccountId: string | null
   githubAccounts: GithubAccount[]
   githubUsername: string
