@@ -172,6 +172,8 @@ export function WorkerTerminalPanel({
       return
     }
 
+    hostElement.replaceChildren()
+
     const term = new Terminal({
       allowProposedApi: false,
       convertEol: false,
@@ -195,25 +197,9 @@ export function WorkerTerminalPanel({
       getWorkerMonitorWebSocketUrl(monitorPort, panelCommand),
     )
     let resizeFrame: number | null = null
-    let refreshFrame: number | null = null
     let resizeTimeout: number | null = null
     let lastSyncedSize: { cols: number; rows: number } | null = null
-
-    const scheduleRefresh = () => {
-      if (refreshFrame !== null) {
-        cancelAnimationFrame(refreshFrame)
-      }
-
-      refreshFrame = window.requestAnimationFrame(() => {
-        refreshFrame = null
-
-        if (term.rows <= 0) {
-          return
-        }
-
-        term.refresh(0, term.rows - 1)
-      })
-    }
+    let lastMeasuredHostSize: { width: number; height: number } | null = null
 
     const syncTerminalSize = (cols: number, rows: number) => {
       if (socket.readyState !== WebSocket.OPEN || cols <= 0 || rows <= 0) {
@@ -249,8 +235,20 @@ export function WorkerTerminalPanel({
           return
         }
 
+        const nextMeasuredHostSize = {
+          height: hostElement.clientHeight,
+          width: hostElement.clientWidth,
+        }
+
+        if (
+          lastMeasuredHostSize?.width === nextMeasuredHostSize.width &&
+          lastMeasuredHostSize.height === nextMeasuredHostSize.height
+        ) {
+          return
+        }
+
+        lastMeasuredHostSize = nextMeasuredHostSize
         fitAddon.fit()
-        scheduleRefresh()
         syncTerminalSize(term.cols, term.rows)
       })
     }
@@ -274,6 +272,7 @@ export function WorkerTerminalPanel({
 
     socket.addEventListener("open", () => {
       lastSyncedSize = null
+      lastMeasuredHostSize = null
       sendResize()
     })
     socket.addEventListener("message", (event) => {
@@ -300,7 +299,6 @@ export function WorkerTerminalPanel({
     })
 
     const resizeDisposable = term.onResize(({ cols, rows }) => {
-      scheduleRefresh()
       syncTerminalSize(cols, rows)
     })
 
@@ -315,6 +313,7 @@ export function WorkerTerminalPanel({
     window.addEventListener("resize", handleWindowResize)
 
     void document.fonts?.ready?.then(() => {
+      lastMeasuredHostSize = null
       sendResize()
     })
 
@@ -335,15 +334,13 @@ export function WorkerTerminalPanel({
       if (resizeFrame !== null) {
         cancelAnimationFrame(resizeFrame)
       }
-      if (refreshFrame !== null) {
-        cancelAnimationFrame(refreshFrame)
-      }
       window.removeEventListener("resize", handleWindowResize)
       resizeObserver.disconnect()
       resizeDisposable.dispose()
       dataDisposable.dispose()
       socket.close()
       term.dispose()
+      hostElement.replaceChildren()
     }
   }, [isReady, monitorPort, panelCommand])
 

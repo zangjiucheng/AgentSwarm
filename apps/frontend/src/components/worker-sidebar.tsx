@@ -56,8 +56,9 @@ function WorkerControls({
   const isStopped = worker.status === "stopped"
 
   return (
-    <div className="mt-3 flex shrink-0 items-center gap-1 self-start">
+    <div className="mt-3 flex shrink-0 items-center gap-1 self-start pr-2">
       <Button
+        className="data-[hover=true]:bg-white/10"
         isIconOnly
         isLoading={isReplacing}
         onPress={() => void onReplaceWorker(worker.id)}
@@ -67,6 +68,7 @@ function WorkerControls({
         <IconRefresh size={16} />
       </Button>
       <Button
+        className="data-[hover=true]:bg-white/10"
         color={isStopped ? "success" : "default"}
         isIconOnly
         isLoading={isStarting || isStopping}
@@ -79,6 +81,7 @@ function WorkerControls({
         {isStopped ? <IconPlayerPlay size={16} /> : <IconPlayerPause size={16} />}
       </Button>
       <Button
+        className="data-[hover=true]:bg-white/10"
         color="danger"
         isIconOnly
         isLoading={isDestroying}
@@ -114,10 +117,14 @@ function WorkerItem({
   const displayStatus = isReplacing ? "migrating" : worker.status
 
   return (
-    <div className={`flex items-start gap-1 pr-2 ${isActive ? "bg-gray-700" : ""}`}>
+    <div
+      className={`group flex items-start gap-1 rounded-md transition ${
+        isActive ? "bg-gray-700" : "hover:bg-white/6"
+      }`}
+    >
       <Button
         as={Link}
-        className="relative h-auto flex-1 flex-col items-start gap-0 rounded-none px-4 py-3 text-left"
+        className="relative h-auto flex-1 flex-col items-start gap-0 rounded-md bg-transparent px-4 py-3 text-left data-[hover=true]:bg-transparent"
         to={`/${worker.id}`}
         variant="light"
         fullWidth
@@ -168,10 +175,14 @@ function SubWorkerItem({
   const displayStatus = isReplacing ? "migrating" : worker.status
 
   return (
-    <div className={`flex items-start gap-1 pr-2 ${isActive ? "bg-gray-700" : ""}`}>
+    <div
+      className={`group flex items-start gap-1 rounded-md transition ${
+        isActive ? "bg-gray-700" : "hover:bg-white/6"
+      }`}
+    >
       <Button
         as={Link}
-        className="relative h-auto flex-1 flex-col items-start gap-0 rounded-none pl-8 pr-4 py-2 text-left"
+        className="relative h-auto flex-1 flex-col items-start gap-0 rounded-md bg-transparent pl-8 pr-4 py-2 text-left data-[hover=true]:bg-transparent"
         to={`/${worker.id}`}
         variant="light"
         fullWidth
