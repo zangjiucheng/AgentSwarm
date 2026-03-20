@@ -63,6 +63,13 @@ type CopyableBlockProps = {
   value: string
 }
 
+type CopyActionCardProps = {
+  copied: boolean
+  description: string
+  label: string
+  onCopy: () => Promise<void>
+}
+
 function CopyableBlock({
   copied,
   label,
@@ -87,6 +94,34 @@ function CopyableBlock({
       <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs text-gray-100">
         {value}
       </pre>
+    </div>
+  )
+}
+
+function CopyActionCard({
+  copied,
+  description,
+  label,
+  onCopy,
+}: CopyActionCardProps) {
+  return (
+    <div className="overflow-hidden rounded-md border border-gray-800 bg-[#171717]">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-3 py-2">
+        <p className="text-default-400 text-[11px] font-medium tracking-[0.16em] uppercase">
+          {label}
+        </p>
+        <Button
+          onPress={() => void onCopy()}
+          size="sm"
+          startContent={copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+          variant="flat"
+        >
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <div className="px-3 py-3 text-xs text-gray-300">
+        {description}
+      </div>
     </div>
   )
 }
@@ -139,7 +174,7 @@ export function WorkerWorkspace({
   const [isDestroying, setIsDestroying] = useState(false)
   const [sshPanelOpen, setSshPanelOpen] = useState(false)
   const [copiedSshField, setCopiedSshField] = useState<
-    "alias" | "command" | "config" | "credential" | null
+    "command" | "config" | "credential" | null
   >(null)
   const copyResetTimeoutRef = useRef<number | null>(null)
 
@@ -183,7 +218,6 @@ export function WorkerWorkspace({
 
     return {
       authMethod: connection.sshAuthMode,
-      alias: configAlias,
       command: `ssh ${sshTarget} -p ${connection.sshPort}`,
       config: [
         `Host ${configAlias}`,
@@ -224,7 +258,7 @@ export function WorkerWorkspace({
   }
 
   const handleCopySshField = async (
-    field: "alias" | "command" | "config" | "credential",
+    field: "command" | "config" | "credential",
     value: string,
   ) => {
     try {
@@ -392,18 +426,12 @@ export function WorkerWorkspace({
                 </Button>
               </div>
               {sshDetails ? (
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-start">
-                  <CopyableBlock
-                    copied={copiedSshField === "alias"}
-                    label="VS Code host alias"
-                    onCopy={() => handleCopySshField("alias", sshDetails.alias)}
-                    value={sshDetails.alias}
-                  />
-                  <CopyableBlock
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-start">
+                  <CopyActionCard
                     copied={copiedSshField === "config"}
                     label="VS Code SSH config"
                     onCopy={() => handleCopySshField("config", sshDetails.config)}
-                    value={sshDetails.config}
+                    description="Copy this block into your SSH config, then connect from VS Code Remote-SSH using the Host entry it defines."
                   />
                   <CopyableBlock
                     copied={copiedSshField === "command"}
@@ -452,7 +480,7 @@ export function WorkerWorkspace({
                           : "SSH is enabled, but no login credential is currently available."}
                     </p>
                     <p>
-                      In VS Code Remote-SSH, add the config block first, then connect using the alias only.
+                      In VS Code Remote-SSH, add the config block first, then connect using the Host entry from your SSH config.
                     </p>
                   </div>
                 </div>
