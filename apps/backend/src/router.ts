@@ -12,10 +12,12 @@ import { config } from "./config"
 import {
   assignWorkerGithubAccount,
   deleteGithubAccount,
+  deleteSshPublicKey,
   getGlobalSettings,
   getStoredGithubAccountIdForWorker,
   saveGithubAccount,
   saveGlobalSettings,
+  saveSshPublicKey,
   setDefaultGithubAccount,
 } from "./secrets"
 import {
@@ -92,6 +94,13 @@ const globalSettingsSchema = z.object({
   ),
   githubUsername: z.string(),
   githubTokenConfigured: z.boolean(),
+  sshPublicKeys: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      publicKey: z.string(),
+    }),
+  ),
 })
 
 const workerOutputs = new Map<string, string>()
@@ -153,6 +162,19 @@ export const appRouter = router({
       await applyGithubAccountsToRunningWorkers()
       return result
     }),
+  saveSshPublicKey: publicProcedure
+    .input(
+      z.object({
+        id: z.string().trim().optional(),
+        name: z.string().trim().min(1),
+        publicKey: z.string().trim().min(1),
+      }),
+    )
+    .output(globalSettingsSchema)
+    .mutation(({ input }) => {
+      clearWorkersCache()
+      return saveSshPublicKey(input)
+    }),
   deleteGithubAccount: publicProcedure
     .input(
       z.object({
@@ -165,6 +187,17 @@ export const appRouter = router({
       const result = deleteGithubAccount(input.id)
       await applyGithubAccountsToRunningWorkers()
       return result
+    }),
+  deleteSshPublicKey: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .output(globalSettingsSchema)
+    .mutation(({ input }) => {
+      clearWorkersCache()
+      return deleteSshPublicKey(input.id)
     }),
   setDefaultGithubAccount: publicProcedure
     .input(
@@ -211,6 +244,7 @@ export const appRouter = router({
     .output(
       z.object({
         available: z.boolean(),
+        sshAuthMode: z.enum(["password", "publicKey", "unknown"]),
         sshPrivateKey: z.string().nullable(),
         sshPassword: z.string().nullable(),
         sshPort: z.number().nullable(),
@@ -233,18 +267,28 @@ export const appRouter = router({
         getContainerEnv(input.id),
       ])
 
+      const sshAuthorizedKeys =
+        env.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
+        env.WORKER_SSH_AUTHORIZED_KEY?.trim() ||
+        ""
       const sshPrivateKey = env.WORKER_SSH_PRIVATE_KEY?.trim() || null
       const sshPort = readPublishedPort(inspection, WORKER_SSH_PORT) ?? null
       const sshEnabled = env.WORKER_SSH_ENABLED === "1"
       const sshPassword = env.WORKER_SSH_PASSWORD?.trim() || null
       const workspaceDir = env.WORKSPACE_DIR?.trim() || "/home/kasm-user/workers"
-      const available =
-        sshEnabled &&
-        sshPort !== null &&
-        (sshPrivateKey !== null || sshPassword !== null)
+      const sshAuthMode =
+        sshPassword !== null
+          ? "password"
+          : sshAuthorizedKeys
+            ? "publicKey"
+            : sshPrivateKey !== null
+              ? "publicKey"
+              : "unknown"
+      const available = sshEnabled && sshPort !== null
 
       return {
         available,
+        sshAuthMode,
         sshPrivateKey,
         sshPassword,
         sshPort,

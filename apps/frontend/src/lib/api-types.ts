@@ -4,6 +4,12 @@ export type GithubAccount = {
   username: string
 }
 
+export type SshPublicKey = {
+  id: string
+  name: string
+  publicKey: string
+}
+
 export type WorkerStatus = "ready" | "error" | "stopped"
 
 export type GlobalSettings = {
@@ -12,6 +18,7 @@ export type GlobalSettings = {
   githubAccounts: GithubAccount[]
   githubUsername: string
   githubTokenConfigured: boolean
+  sshPublicKeys: SshPublicKey[]
 }
 
 export type PresetInfo = {
@@ -43,6 +50,7 @@ export type WorkerInfo = {
 
 export type WorkerConnectionInfo = {
   available: boolean
+  sshAuthMode: "password" | "publicKey" | "unknown"
   sshPrivateKey: string | null
   sshPassword: string | null
   sshPort: number | null

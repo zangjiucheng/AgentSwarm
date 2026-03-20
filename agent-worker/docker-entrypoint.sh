@@ -9,15 +9,15 @@ MONITOR_PORT="${MONITOR_PORT:-51301}"
 SSH_PORT="${SSH_PORT:-2222}"
 STARTUP_REPO_URL="${STARTUP_REPO_URL:-}"
 WORKER_SSH_ENABLED="${WORKER_SSH_ENABLED:-0}"
-WORKER_SSH_AUTHORIZED_KEY="${WORKER_SSH_AUTHORIZED_KEY:-}"
+WORKER_SSH_AUTHORIZED_KEYS="${WORKER_SSH_AUTHORIZED_KEYS:-${WORKER_SSH_AUTHORIZED_KEY:-}}"
 WORKER_SSH_PASSWORD="${WORKER_SSH_PASSWORD:-}"
 BASH_BIN="$(readlink -f "$(command -v bash)")"
 SETPRIV_BIN="$(readlink -f "$(command -v setpriv)")"
 NIX_DAEMON_BIN="$(readlink -f "$(command -v nix-daemon)")"
 BUN_BIN="$(readlink -f "$(command -v bun)")"
 CHPASSWD_BIN="$(readlink -f "$(command -v chpasswd)")"
-SSHD_BIN="$(readlink -f "$(command -v sshd)")"
-SSH_KEYGEN_BIN="$(readlink -f "$(command -v ssh-keygen)")"
+DROPBEAR_BIN="$(readlink -f "$(command -v dropbear)")"
+DROPBEARKEY_BIN="$(readlink -f "$(command -v dropbearkey)")"
 MONITOR_SCRIPT="/usr/local/bin/monitor.js"
 BUN_PTY_LIB=""
 ARCH="$(uname -m)"
@@ -88,10 +88,7 @@ setup_sshd() {
     return 0
   fi
 
-  mkdir -p /etc/ssh /run/sshd
-  chmod 755 /run/sshd
-  mkdir -p /var/empty
-  chmod 755 /var/empty
+  mkdir -p /etc/dropbear /run
 
   if [ -L /etc/passwd ]; then
     cp -L /etc/passwd /tmp/passwd
@@ -107,58 +104,37 @@ setup_sshd() {
     chmod 600 /etc/shadow
   fi
 
-  if ! grep -q '^sshd:' /etc/group; then
-    printf '%s\n' 'sshd:x:74:' >> /etc/group
-  fi
-
-  if ! grep -q '^sshd:' /etc/passwd; then
-    printf '%s\n' 'sshd:x:74:74:Privilege-separated SSH:/var/empty:/bin/sh' >> /etc/passwd
-  fi
-
   mkdir -p "$HOME_DIR/.ssh"
   chmod 700 "$HOME_DIR/.ssh"
   touch "$HOME_DIR/.ssh/authorized_keys"
   chmod 600 "$HOME_DIR/.ssh/authorized_keys"
   chown -R 1000:1000 "$HOME_DIR/.ssh"
 
-  if [ -n "$WORKER_SSH_AUTHORIZED_KEY" ]; then
-    printf '%s\n' "$WORKER_SSH_AUTHORIZED_KEY" > "$HOME_DIR/.ssh/authorized_keys"
+  if [ -n "$WORKER_SSH_AUTHORIZED_KEYS" ]; then
+    printf '%s\n' "$WORKER_SSH_AUTHORIZED_KEYS" > "$HOME_DIR/.ssh/authorized_keys"
     chmod 600 "$HOME_DIR/.ssh/authorized_keys"
     chown 1000:1000 "$HOME_DIR/.ssh/authorized_keys"
   fi
 
-  if [ -n "$WORKER_SSH_PASSWORD" ]; then
+  if [ -z "$WORKER_SSH_AUTHORIZED_KEYS" ] && [ -n "$WORKER_SSH_PASSWORD" ]; then
     printf 'kasm-user:%s\n' "$WORKER_SSH_PASSWORD" | "$CHPASSWD_BIN" -c SHA512
   fi
 
-  if [ ! -f /etc/ssh/ssh_host_ed25519_key ] || [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
-    "$SSH_KEYGEN_BIN" -A >/tmp/ssh-keygen.log 2>&1 || {
+  if [ ! -f /etc/dropbear/dropbear_ed25519_host_key ]; then
+    "$DROPBEARKEY_BIN" -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key >/tmp/ssh-keygen.log 2>&1 || {
       cat /tmp/ssh-keygen.log >&2 || true
       return 1
     }
   fi
 
-  cat > /etc/ssh/sshd_config <<EOF
-Port $SSH_PORT
-ListenAddress 0.0.0.0
-HostKey /etc/ssh/ssh_host_ed25519_key
-HostKey /etc/ssh/ssh_host_rsa_key
-AllowUsers kasm-user
-AuthorizedKeysFile .ssh/authorized_keys
-ChallengeResponseAuthentication no
-KbdInteractiveAuthentication no
-PubkeyAuthentication yes
-PasswordAuthentication no
-PermitEmptyPasswords no
-PermitRootLogin no
-PidFile /run/sshd.pid
-PrintMotd no
-Subsystem sftp internal-sftp
-UsePAM no
-X11Forwarding no
-EOF
-
-  "$SSHD_BIN" -D -e -f /etc/ssh/sshd_config >/tmp/sshd.log 2>&1 &
+  "$DROPBEAR_BIN" \
+    -F \
+    -E \
+    -w \
+    $([ -n "$WORKER_SSH_AUTHORIZED_KEYS" ] && printf '%s' '-s') \
+    -p "$SSH_PORT" \
+    -r /etc/dropbear/dropbear_ed25519_host_key \
+    >/tmp/sshd.log 2>&1 &
   SSHD_PID=$!
 }
 

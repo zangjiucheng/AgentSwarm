@@ -44,7 +44,9 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "SHLVL",
     "USER",
     "WORKER_SSH_AUTHORIZED_KEY",
+    "WORKER_SSH_AUTHORIZED_KEYS",
     "WORKER_SSH_ENABLED",
+    "WORKER_SSH_PASSWORD",
     "WORKER_SSH_PRIVATE_KEY",
     "WORKER_PROFILE",
   ]) {

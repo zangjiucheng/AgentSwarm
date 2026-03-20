@@ -5,19 +5,20 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Snippet,
 } from "@heroui/react"
 import {
+  IconCheck,
   IconChevronDown,
   IconChevronRight,
   IconBrandGithub,
+  IconCopy,
   IconRefresh,
   IconExternalLink,
   IconPlayerPause,
   IconPlayerPlay,
   IconTrash,
 } from "@tabler/icons-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { GlobalSettings, WorkerConnectionInfo, WorkerInfo } from "../lib/api-types"
 import { getWorkerIframeUrl } from "../lib/worker-urls"
 import { trpc } from "../trpc"
@@ -41,6 +42,70 @@ type WorkerWorkspaceProps = {
   worker: WorkerInfo
 }
 
+type CopyableBlockProps = {
+  copied: boolean
+  label: string
+  onCopy: () => Promise<void>
+  value: string
+}
+
+function CopyableBlock({
+  copied,
+  label,
+  onCopy,
+  value,
+}: CopyableBlockProps) {
+  return (
+    <div className="overflow-hidden rounded-md border border-gray-800 bg-[#171717]">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-3 py-2">
+        <p className="text-default-400 text-[11px] font-medium tracking-[0.16em] uppercase">
+          {label}
+        </p>
+        <Button
+          onPress={() => void onCopy()}
+          size="sm"
+          startContent={copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+          variant="flat"
+        >
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs text-gray-100">
+        {value}
+      </pre>
+    </div>
+  )
+}
+
+async function copyTextToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value)
+      return
+    } catch {
+      // Fall back to a manual textarea-based copy path on browsers where
+      // clipboard permissions fail despite the API being present.
+    }
+  }
+
+  const textarea = document.createElement("textarea")
+  textarea.value = value
+  textarea.setAttribute("readonly", "")
+  textarea.style.position = "fixed"
+  textarea.style.opacity = "0"
+  textarea.style.pointerEvents = "none"
+  document.body.append(textarea)
+  textarea.focus()
+  textarea.select()
+
+  const copied = document.execCommand("copy")
+  textarea.remove()
+
+  if (!copied) {
+    throw new Error("Clipboard copy failed")
+  }
+}
+
 export function WorkerWorkspace({
   globalSettings,
   isReplacing,
@@ -59,6 +124,18 @@ export function WorkerWorkspace({
   const [githubModalOpen, setGithubModalOpen] = useState(false)
   const [isDestroying, setIsDestroying] = useState(false)
   const [sshPanelOpen, setSshPanelOpen] = useState(false)
+  const [copiedSshField, setCopiedSshField] = useState<"command" | "credential" | null>(
+    null,
+  )
+  const copyResetTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current)
+      }
+    }
+  }, [])
 
   if (state === "unloaded") {
     return null
@@ -90,10 +167,26 @@ export function WorkerWorkspace({
 
     const host = window.location.hostname
     const sshTarget = `${connection.sshUser}@${host}`
+    const password = connection.sshPassword
+    const privateKey = connection.sshPrivateKey
+
     return {
+      authMethod: connection.sshAuthMode,
       command: `ssh ${sshTarget} -p ${connection.sshPort}`,
-      privateKey: connection.sshPrivateKey,
-      password: connection.sshPassword,
+      credentialLabel:
+        connection.sshAuthMode === "password"
+          ? "Password"
+          : connection.sshAuthMode === "publicKey"
+            ? "Authorized keys"
+            : "SSH credential",
+      credentialValue:
+        connection.sshAuthMode === "password"
+          ? password
+          : connection.sshAuthMode === "publicKey"
+            ? null
+            : privateKey,
+      privateKey,
+      password,
       target: sshTarget,
       workspaceDir: connection.workspaceDir ?? "/home/kasm-user/workers",
     }
@@ -106,6 +199,27 @@ export function WorkerWorkspace({
     } finally {
       setIsDestroying(false)
       setDestroyModalOpen(false)
+    }
+  }
+
+  const handleCopySshField = async (
+    field: "command" | "credential",
+    value: string,
+  ) => {
+    try {
+      await copyTextToClipboard(value)
+      setCopiedSshField(field)
+
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current)
+      }
+
+      copyResetTimeoutRef.current = window.setTimeout(() => {
+        setCopiedSshField((current) => (current === field ? null : current))
+        copyResetTimeoutRef.current = null
+      }, 1500)
+    } catch {
+      window.alert("Failed to copy SSH content to the clipboard")
     }
   }
 
@@ -254,51 +368,51 @@ export function WorkerWorkspace({
               </div>
               {sshDetails ? (
                 <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-start">
-                  <Snippet
-                    classNames={{
-                      base: "bg-default-100 items-start",
-                      pre: "whitespace-pre-wrap break-all font-mono text-xs",
-                    }}
-                    symbol=""
-                    variant="flat"
-                  >
-                    {sshDetails.command}
-                  </Snippet>
-                  {sshDetails.privateKey ? (
-                    <Snippet
-                      classNames={{
-                        base: "bg-default-100 items-start",
-                        pre: "whitespace-pre-wrap break-all font-mono text-xs",
-                      }}
-                      symbol=""
-                      variant="flat"
-                    >
-                      {sshDetails.privateKey}
-                    </Snippet>
+                  <CopyableBlock
+                    copied={copiedSshField === "command"}
+                    label="SSH command"
+                    onCopy={() => handleCopySshField("command", sshDetails.command)}
+                    value={sshDetails.command}
+                  />
+                  {sshDetails.credentialValue ? (
+                    <CopyableBlock
+                      copied={copiedSshField === "credential"}
+                      label={sshDetails.credentialLabel}
+                      onCopy={() =>
+                        handleCopySshField("credential", sshDetails.credentialValue ?? "")
+                      }
+                      value={sshDetails.credentialValue}
+                    />
                   ) : (
-                    <Snippet
-                      classNames={{
-                        base: "bg-default-100 items-start",
-                        pre: "whitespace-pre-wrap break-all font-mono text-xs",
-                      }}
-                      symbol=""
-                      variant="flat"
-                    >
-                      {sshDetails.password ?? "SSH credential unavailable"}
-                    </Snippet>
+                    <div className="overflow-hidden rounded-md border border-gray-800 bg-[#171717]">
+                      <div className="border-b border-gray-800 px-3 py-2">
+                        <p className="text-default-400 text-[11px] font-medium tracking-[0.16em] uppercase">
+                          {sshDetails.credentialLabel}
+                        </p>
+                      </div>
+                      <div className="px-3 py-3 text-xs text-gray-300">
+                        {globalSettings.sshPublicKeys.length > 0
+                          ? `This worker trusts ${globalSettings.sshPublicKeys.length} public key${globalSettings.sshPublicKeys.length === 1 ? "" : "s"} from Settings.`
+                          : "No public keys are configured in Settings."}
+                      </div>
+                    </div>
                   )}
                   <div className="text-default-400 text-xs">
                     <p>User: `kasm-user`</p>
                     <p>Workspace: `{sshDetails.workspaceDir}`</p>
                     <p>
-                      {sshDetails.privateKey
-                        ? "Auth: private key"
-                        : "Auth: password"}
+                      {sshDetails.authMethod === "publicKey"
+                        ? "Auth: public key"
+                        : sshDetails.authMethod === "password"
+                          ? "Auth: password"
+                          : "Auth: unknown"}
                     </p>
                     <p>
-                      {sshDetails.privateKey
-                        ? "Use the command on the left with the private key in the middle."
-                        : "Use VS Code Remote-SSH with the command on the left."}
+                      {sshDetails.authMethod === "publicKey"
+                        ? "Use one of the public keys configured in Settings on your local machine."
+                        : sshDetails.authMethod === "password"
+                          ? "Use the command on the left with the password in the middle."
+                          : "SSH is enabled, but no login credential is currently available."}
                     </p>
                   </div>
                 </div>

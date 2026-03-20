@@ -11,19 +11,31 @@ const GithubAccountSchema = z.object({
   username: z.string(),
 })
 
+const SshPublicKeySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  publicKey: z.string(),
+})
+
 const SecretStoreSchema = z.object({
   autoPauseMinutes: z.number().int().nonnegative().nullable().default(null),
   defaultGithubAccountId: z.string().default(""),
   githubAccounts: z.array(GithubAccountSchema).default([]),
   githubToken: z.string().default(""),
   githubUsername: z.string().default(""),
+  sshPublicKeys: z.array(SshPublicKeySchema).default([]),
   workerGithubAccountIds: z.record(z.string(), z.string()).default({}),
 })
 
 type GithubAccount = z.infer<typeof GithubAccountSchema>
+type SshPublicKey = z.infer<typeof SshPublicKeySchema>
 type SecretStore = z.infer<typeof SecretStoreSchema>
 
 export type GithubAccountPublic = Omit<GithubAccount, "token">
+export type SshPublicKeyPublic = SshPublicKey
+
+const SSH_PUBLIC_KEY_PATTERN =
+  /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)\s+[A-Za-z0-9+/]+={0,3}(?:\s+.+)?$/
 
 function readEnv(name: string, fallback?: string) {
   return process.env[name] ?? fallback
@@ -42,6 +54,33 @@ function toPublicGithubAccount(account: GithubAccount): GithubAccountPublic {
     name: account.name,
     username: account.username,
   }
+}
+
+function normalizeSshPublicKeyValue(publicKey: string) {
+  return publicKey
+    .trim()
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n")
+}
+
+function assertValidSshPublicKey(publicKey: string) {
+  const normalized = normalizeSshPublicKeyValue(publicKey)
+  const lines = normalized.split("\n")
+
+  if (lines.length === 0) {
+    throw new Error("SSH public key cannot be empty")
+  }
+
+  for (const line of lines) {
+    if (!SSH_PUBLIC_KEY_PATTERN.test(line)) {
+      throw new Error("SSH public key format is invalid")
+    }
+  }
+
+  return normalized
 }
 
 function normalizeSecretStore(store: SecretStore): SecretStore {
@@ -79,6 +118,11 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
     githubAccounts,
     githubToken: "",
     githubUsername: "",
+    sshPublicKeys: store.sshPublicKeys.map((key) => ({
+      id: key.id,
+      name: key.name.trim(),
+      publicKey: normalizeSshPublicKeyValue(key.publicKey),
+    })),
     workerGithubAccountIds: filteredWorkerGithubAccountIds,
   }
 }
@@ -156,6 +200,7 @@ export function getGlobalSettings() {
     githubAccounts: secretStore.githubAccounts.map(toPublicGithubAccount),
     githubTokenConfigured: secretStore.githubAccounts.length > 0,
     githubUsername: defaultAccount?.username ?? "",
+    sshPublicKeys: secretStore.sshPublicKeys,
   }
 }
 
@@ -244,6 +289,47 @@ export function saveGlobalSettings(input: {
 
 export function getAutoPauseMinutes() {
   return secretStore.autoPauseMinutes
+}
+
+export function saveSshPublicKey(input: {
+  id?: string
+  name: string
+  publicKey: string
+}) {
+  const id = input.id?.trim() || randomUUID()
+  const nextKey: SshPublicKey = {
+    id,
+    name: input.name.trim() || "SSH key",
+    publicKey: assertValidSshPublicKey(input.publicKey),
+  }
+
+  const existingIndex = secretStore.sshPublicKeys.findIndex((key) => key.id === id)
+  const nextSshPublicKeys =
+    existingIndex >= 0
+      ? secretStore.sshPublicKeys.map((key, index) =>
+          index === existingIndex ? nextKey : key,
+        )
+      : [...secretStore.sshPublicKeys, nextKey]
+
+  persistSecretStore(
+    normalizeSecretStore({
+      ...secretStore,
+      sshPublicKeys: nextSshPublicKeys,
+    }),
+  )
+
+  return getGlobalSettings()
+}
+
+export function deleteSshPublicKey(id: string) {
+  persistSecretStore(
+    normalizeSecretStore({
+      ...secretStore,
+      sshPublicKeys: secretStore.sshPublicKeys.filter((key) => key.id !== id),
+    }),
+  )
+
+  return getGlobalSettings()
 }
 
 export function deleteGithubAccount(accountId: string) {
@@ -352,6 +438,12 @@ export function getWorkerSecretEnv(options?: {
 
   if (account?.username) {
     env.GITHUB_USERNAME = account.username
+  }
+
+  if (secretStore.sshPublicKeys.length > 0) {
+    env.WORKER_SSH_AUTHORIZED_KEYS = secretStore.sshPublicKeys
+      .map((key) => key.publicKey)
+      .join("\n")
   }
 
   return env

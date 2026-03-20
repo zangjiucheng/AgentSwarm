@@ -1,5 +1,5 @@
 import type Docker from "dockerode"
-import { generateKeyPairSync, randomUUID } from "node:crypto"
+import { randomBytes, randomUUID } from "node:crypto"
 import { posix as pathPosix } from "node:path"
 import {
   docker,
@@ -68,46 +68,8 @@ function createWorkspaceVolumeName() {
   return `agentswarm-worker-${randomUUID()}`
 }
 
-function toSshStringBuffer(value: Buffer) {
-  const length = Buffer.alloc(4)
-  length.writeUInt32BE(value.length, 0)
-  return Buffer.concat([length, value])
-}
-
-function createWorkerSshCredentials() {
-  const { privateKey, publicKey } = generateKeyPairSync("ed25519")
-  const privateKeyPem = privateKey.export({
-    format: "pem",
-    type: "pkcs8",
-  })
-  const publicKeyJwk = publicKey.export({
-    format: "jwk",
-  })
-
-  if (
-    typeof publicKeyJwk !== "object" ||
-    publicKeyJwk === null ||
-    typeof publicKeyJwk.x !== "string"
-  ) {
-    throw new Error("Failed to export worker SSH public key")
-  }
-
-  const keyType = Buffer.from("ssh-ed25519")
-  const publicKeyRaw = Buffer.from(publicKeyJwk.x, "base64url")
-  const authorizedKeyBuffer = Buffer.concat([
-    toSshStringBuffer(keyType),
-    toSshStringBuffer(publicKeyRaw),
-  ])
-  const authorizedKey =
-    `ssh-ed25519 ${authorizedKeyBuffer.toString("base64")} agentswarm-worker`
-
-  return {
-    authorizedKey,
-    privateKey:
-      typeof privateKeyPem === "string"
-        ? privateKeyPem
-        : privateKeyPem.toString("utf8"),
-  }
+function createWorkerSshPassword() {
+  return randomBytes(18).toString("base64url")
 }
 
 function inferRepositoryDirectoryName(cloneRepositoryUrl: string) {
@@ -209,15 +171,22 @@ export async function startWorkerContainer({
       : {}
   const secretEnv = getWorkerSecretEnv({ accountId: githubAccountId })
   const sshEnabled = enableSsh ?? env.WORKER_SSH_ENABLED === "1"
-  const sshCredentials = sshEnabled ? createWorkerSshCredentials() : undefined
+  const sshAuthorizedKeys =
+    env.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
+    secretEnv.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
+    ""
   const sshEnv = sshEnabled
     ? {
         SSH_PORT: "2222",
-        WORKER_SSH_AUTHORIZED_KEY:
-          env.WORKER_SSH_AUTHORIZED_KEY?.trim() || sshCredentials?.authorizedKey || "",
+        ...(sshAuthorizedKeys
+          ? {
+              WORKER_SSH_AUTHORIZED_KEYS: sshAuthorizedKeys,
+            }
+          : {
+              WORKER_SSH_PASSWORD:
+                env.WORKER_SSH_PASSWORD?.trim() || createWorkerSshPassword(),
+            }),
         WORKER_SSH_ENABLED: "1",
-        WORKER_SSH_PRIVATE_KEY:
-          env.WORKER_SSH_PRIVATE_KEY || sshCredentials?.privateKey || "",
       }
     : {
         WORKER_SSH_ENABLED: "0",

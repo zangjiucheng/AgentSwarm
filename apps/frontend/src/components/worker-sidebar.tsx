@@ -56,7 +56,7 @@ function WorkerControls({
   const isStopped = worker.status === "stopped"
 
   return (
-    <div className="mt-3 flex shrink-0 items-center gap-1 self-start pr-2">
+    <div className="flex shrink-0 items-center gap-1 self-stretch px-2">
       <Button
         className="data-[hover=true]:bg-white/10"
         isIconOnly
@@ -118,7 +118,7 @@ function WorkerItem({
 
   return (
     <div
-      className={`group flex items-start gap-1 rounded-md transition ${
+      className={`group flex items-stretch gap-1 rounded-md transition ${
         isActive ? "bg-gray-700" : "hover:bg-white/6"
       }`}
     >
@@ -176,7 +176,7 @@ function SubWorkerItem({
 
   return (
     <div
-      className={`group flex items-start gap-1 rounded-md transition ${
+      className={`group flex items-stretch gap-1 rounded-md transition ${
         isActive ? "bg-gray-700" : "hover:bg-white/6"
       }`}
     >

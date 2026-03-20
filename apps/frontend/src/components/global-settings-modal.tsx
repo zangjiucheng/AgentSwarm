@@ -6,6 +6,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  Textarea,
 } from "@heroui/react"
 import {
   IconBrandGithub,
@@ -34,6 +35,8 @@ export function GlobalSettingsModal({
   const [autoPauseMinutes, setAutoPauseMinutes] = useState("")
   const [githubUsername, setGithubUsername] = useState("")
   const [githubToken, setGithubToken] = useState("")
+  const [sshKeyName, setSshKeyName] = useState("")
+  const [sshPublicKey, setSshPublicKey] = useState("")
 
   const refreshQueries = async () => {
     await Promise.all([
@@ -55,7 +58,19 @@ export function GlobalSettingsModal({
     onSuccess: refreshQueries,
   })
 
+  const saveSshPublicKey = trpc.saveSshPublicKey.useMutation({
+    onSuccess: async () => {
+      setSshKeyName("")
+      setSshPublicKey("")
+      await refreshQueries()
+    },
+  })
+
   const deleteGithubAccount = trpc.deleteGithubAccount.useMutation({
+    onSuccess: refreshQueries,
+  })
+
+  const deleteSshPublicKey = trpc.deleteSshPublicKey.useMutation({
     onSuccess: refreshQueries,
   })
 
@@ -71,9 +86,13 @@ export function GlobalSettingsModal({
     )
     setGithubUsername("")
     setGithubToken("")
+    setSshKeyName("")
+    setSshPublicKey("")
     saveGlobalSettings.reset()
     saveGithubAccount.reset()
+    saveSshPublicKey.reset()
     deleteGithubAccount.reset()
+    deleteSshPublicKey.reset()
     setDefaultGithubAccount.reset()
   }
 
@@ -103,6 +122,10 @@ export function GlobalSettingsModal({
     )
   }, [accountName, githubToken, githubUsername])
 
+  const canAddSshKey = useMemo(() => {
+    return sshKeyName.trim().length > 0 && sshPublicKey.trim().length > 0
+  }, [sshKeyName, sshPublicKey])
+
   const parsedAutoPauseMinutes = autoPauseMinutes.trim()
     ? Number.parseInt(autoPauseMinutes.trim(), 10)
     : null
@@ -119,7 +142,9 @@ export function GlobalSettingsModal({
   const errorMessage =
     saveGlobalSettings.error?.message ??
     saveGithubAccount.error?.message ??
+    saveSshPublicKey.error?.message ??
     deleteGithubAccount.error?.message ??
+    deleteSshPublicKey.error?.message ??
     setDefaultGithubAccount.error?.message
 
   const activeAction =
@@ -351,6 +376,102 @@ export function GlobalSettingsModal({
                       <p className="text-default-400 text-xs">
                         Auto-pause is based on worker runtime after start, not keyboard or terminal activity.
                       </p>
+                    </div>
+
+                    <div className="space-y-4 rounded-xl border border-default-200 px-4 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-default-800">
+                          SSH public keys
+                        </p>
+                        <p className="text-default-500 mt-1 text-xs">
+                          Workers with SSH enabled will trust these public keys. Add multiple keys if you use multiple devices.
+                        </p>
+                        <p className="text-default-400 mt-2 text-xs">
+                          Existing workers need `Migrate` or SSH re-enable before updated keys take effect.
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        {settings.sshPublicKeys.length > 0 ? (
+                          settings.sshPublicKeys.map((key) => (
+                            <div
+                              className="flex items-start justify-between gap-4 rounded-xl border border-default-200 px-4 py-3"
+                              key={key.id}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-default-800">
+                                  {key.name}
+                                </p>
+                                <pre className="text-default-500 mt-1 whitespace-pre-wrap break-all font-mono text-[11px]">
+                                  {key.publicKey}
+                                </pre>
+                              </div>
+                              <Button
+                                color="danger"
+                                isLoading={
+                                  deleteSshPublicKey.isPending &&
+                                  deleteSshPublicKey.variables?.id === key.id
+                                }
+                                onPress={() => {
+                                  if (!window.confirm(`Delete SSH key "${key.name}"?`)) {
+                                    return
+                                  }
+
+                                  deleteSshPublicKey.mutate({ id: key.id })
+                                }}
+                                size="sm"
+                                variant="light"
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-default-200 px-4 py-6">
+                            <p className="text-default-400 text-sm">
+                              No SSH public keys saved yet.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-4 rounded-xl border border-default-200 px-4 py-4">
+                        <p className="text-sm font-medium text-default-800">
+                          Add public key
+                        </p>
+                        <Input
+                          description="A label to help you identify this key later."
+                          label="Key name"
+                          onValueChange={setSshKeyName}
+                          placeholder="MacBook Pro"
+                          value={sshKeyName}
+                        />
+                        <Textarea
+                          description="Paste your SSH public key, for example ssh-ed25519 ..."
+                          label="Public key"
+                          minRows={3}
+                          onValueChange={setSshPublicKey}
+                          placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."
+                          value={sshPublicKey}
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            color="primary"
+                            isDisabled={!canAddSshKey}
+                            isLoading={saveSshPublicKey.isPending}
+                            onPress={() =>
+                              saveSshPublicKey.mutate({
+                                name: sshKeyName.trim(),
+                                publicKey: sshPublicKey.trim(),
+                              })
+                            }
+                            size="sm"
+                            variant="flat"
+                          >
+                            Add SSH key
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

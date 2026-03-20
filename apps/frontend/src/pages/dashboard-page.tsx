@@ -66,6 +66,7 @@ export function DashboardPage() {
     githubAccounts: [],
     githubUsername: "",
     githubTokenConfigured: false,
+    sshPublicKeys: [],
   }
 
   useEffect(() => {

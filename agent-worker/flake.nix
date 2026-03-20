@@ -37,6 +37,7 @@
             coreutils
             curl
             docker
+            dropbear
             findutils
             gawk
             gh
