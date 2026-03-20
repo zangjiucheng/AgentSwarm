@@ -2,17 +2,35 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]-}"
+ROOT_DIR=""
+if [ -n "$SCRIPT_PATH" ] && [ "$SCRIPT_PATH" != "-" ]; then
+  ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd || true)"
+fi
+
+HAS_LOCAL_CHECKOUT=0
+if [ -n "$ROOT_DIR" ] && [ -f "$ROOT_DIR/build.sh" ] && [ -f "$ROOT_DIR/apps/backend/config.json" ]; then
+  HAS_LOCAL_CHECKOUT=1
+fi
+
 CONTAINER_NAME="${CONTAINER_NAME:-agentswarm}"
 IMAGE_TAG="${IMAGE_TAG:-agent-swarm:latest}"
 WORKER_IMAGE_TAG="${WORKER_IMAGE_TAG:-agent-worker:latest}"
 PORT="${PORT:-14000}"
-CONFIG_FILE="${CONFIG_FILE:-$ROOT_DIR/apps/backend/config.json}"
+CONFIG_FILE="${CONFIG_FILE:-}"
 CLEANUP_WORKERS=0
 USE_REMOTE_IMAGES="${USE_REMOTE_IMAGES:-0}"
 REMOTE_IMAGE_TAG="${REMOTE_IMAGE_TAG:-ghcr.io/zangjiucheng/agentswarm:latest}"
 REMOTE_WORKER_IMAGE_TAG="${REMOTE_WORKER_IMAGE_TAG:-ghcr.io/zangjiucheng/agentswarm-worker:latest}"
-GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-$ROOT_DIR/.agentswarm}"
+if [ -z "$CONFIG_FILE" ] && [ "$HAS_LOCAL_CHECKOUT" -eq 1 ]; then
+  CONFIG_FILE="$ROOT_DIR/apps/backend/config.json"
+fi
+
+if [ "$HAS_LOCAL_CHECKOUT" -eq 1 ]; then
+  GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-$ROOT_DIR/.agentswarm}"
+else
+  GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-${HOME:-/tmp}/.agentswarm}"
+fi
 TMP_CONFIG_FILE=""
 
 find_python_bin() {
@@ -47,6 +65,9 @@ find_python_bin() {
 
 get_default_branch() {
   local ref
+  if [ "$HAS_LOCAL_CHECKOUT" -eq 0 ]; then
+    return 0
+  fi
   ref="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
   echo "${ref#origin/}"
 }
@@ -79,6 +100,81 @@ pull_first_available_image() {
   return 1
 }
 
+write_default_config() {
+  local output_path="$1"
+  local worker_image_tag="$2"
+
+  cat > "$output_path" <<EOF
+{
+  "drinode": "/dev/dri/renderD128",
+  "presets": [
+    {
+      "name": "default",
+      "imageTag": "$worker_image_tag",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng's Agent Swarm",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng's Agent Swarm",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com"
+      },
+      "requiredEnv": []
+    },
+    {
+      "name": "frontend",
+      "imageTag": "$worker_image_tag",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng Frontend Swarm",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng Frontend Swarm",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "NODE_ENV": "development",
+        "BROWSER": "none"
+      },
+      "requiredEnv": []
+    },
+    {
+      "name": "fullstack",
+      "imageTag": "$worker_image_tag",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng Fullstack Swarm",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng Fullstack Swarm",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "NODE_ENV": "development"
+      },
+      "requiredEnv": []
+    },
+    {
+      "name": "oss-contrib",
+      "imageTag": "$worker_image_tag",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng OSS Swarm",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng OSS Swarm",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "GH_PROMPT_DISABLED": "1"
+      },
+      "requiredEnv": []
+    },
+    {
+      "name": "ai-agent",
+      "imageTag": "$worker_image_tag",
+      "presetEnv": {
+        "GIT_AUTHOR_NAME": "Jiucheng AI Agent",
+        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_COMMITTER_NAME": "Jiucheng AI Agent",
+        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "NODE_ENV": "development"
+      },
+      "requiredEnv": [
+        "OPENAI_API_KEY"
+      ]
+    }
+  ]
+}
+EOF
+}
+
 while (($# > 0)); do
   case "$1" in
     --cleanup-workers)
@@ -96,7 +192,9 @@ while (($# > 0)); do
   shift
 done
 
-cd "$ROOT_DIR"
+if [ "$HAS_LOCAL_CHECKOUT" -eq 1 ]; then
+  cd "$ROOT_DIR"
+fi
 
 if [ "$USE_REMOTE_IMAGES" -eq 1 ]; then
   remote_image_repo="${REMOTE_IMAGE_TAG%:*}"
@@ -136,20 +234,17 @@ if [ "$USE_REMOTE_IMAGES" -eq 1 ]; then
   fi
 
   source_config_file="$CONFIG_FILE"
-  if [ ! -f "$source_config_file" ]; then
-    echo "Config file not found: $source_config_file" >&2
-    exit 1
-  fi
-
   mkdir -p "$GENERATED_CONFIG_DIR"
   TMP_CONFIG_FILE="$GENERATED_CONFIG_DIR/${CONTAINER_NAME}-config.json"
-  PYTHON_BIN="$(find_python_bin || true)"
-  if [ -z "$PYTHON_BIN" ]; then
-    echo "Python 3 is required to rewrite the generated config. Set PYTHON_BIN to a working interpreter if needed." >&2
-    exit 1
-  fi
 
-  "$PYTHON_BIN" - "$source_config_file" "$TMP_CONFIG_FILE" "$WORKER_IMAGE_TAG" <<'PY'
+  if [ -n "$source_config_file" ] && [ -f "$source_config_file" ]; then
+    PYTHON_BIN="$(find_python_bin || true)"
+    if [ -z "$PYTHON_BIN" ]; then
+      echo "Python 3 is required to rewrite the generated config. Set PYTHON_BIN to a working interpreter if needed." >&2
+      exit 1
+    fi
+
+    "$PYTHON_BIN" - "$source_config_file" "$TMP_CONFIG_FILE" "$WORKER_IMAGE_TAG" <<'PY'
 import json
 import sys
 
@@ -164,14 +259,27 @@ for preset in data.get("presets", []):
     next_preset["imageTag"] = worker_image_tag
     presets.append(next_preset)
 
+data["presets"] = presets
+
 with open(output_path, "w", encoding="utf-8") as fh:
-    json.dump({"presets": presets}, fh, ensure_ascii=False, indent=2)
+    json.dump(data, fh, ensure_ascii=False, indent=2)
     fh.write("\n")
 PY
+  else
+    write_default_config "$TMP_CONFIG_FILE" "$WORKER_IMAGE_TAG"
+  fi
   CONFIG_FILE="$TMP_CONFIG_FILE"
 elif [ "$CLEANUP_WORKERS" -eq 1 ]; then
+  if [ "$HAS_LOCAL_CHECKOUT" -eq 0 ]; then
+    echo "Local cleanup builds require a repository checkout. Use --remote-images when running from curl." >&2
+    exit 1
+  fi
   ./build.sh --cleanup-workers
 else
+  if [ "$HAS_LOCAL_CHECKOUT" -eq 0 ]; then
+    echo "Local build mode requires a repository checkout. Use --remote-images when running from curl." >&2
+    exit 1
+  fi
   ./build.sh
 fi
 

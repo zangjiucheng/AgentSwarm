@@ -2,14 +2,29 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]-}"
+ROOT_DIR=""
+if [ -n "$SCRIPT_PATH" ] && [ "$SCRIPT_PATH" != "-" ]; then
+  ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd || true)"
+fi
+
+HAS_LOCAL_CHECKOUT=0
+if [ -n "$ROOT_DIR" ] && [ -f "$ROOT_DIR/clean.sh" ]; then
+  HAS_LOCAL_CHECKOUT=1
+fi
+
 CONTAINER_NAME="${CONTAINER_NAME:-agentswarm}"
 IMAGE_TAG="${IMAGE_TAG:-${AGENT_SWARM_IMAGE_TAG:-agent-swarm:latest}}"
 WORKER_IMAGE_TAG="${WORKER_IMAGE_TAG:-${AGENT_WORKER_IMAGE_TAG:-agent-worker:latest}}"
-USE_REMOTE_IMAGES="${USE_REMOTE_IMAGES:-0}"
+if [ "$HAS_LOCAL_CHECKOUT" -eq 1 ]; then
+  USE_REMOTE_IMAGES="${USE_REMOTE_IMAGES:-0}"
+  GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-$ROOT_DIR/.agentswarm}"
+else
+  USE_REMOTE_IMAGES="${USE_REMOTE_IMAGES:-1}"
+  GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-${HOME:-/tmp}/.agentswarm}"
+fi
 REMOTE_IMAGE_TAG="${REMOTE_IMAGE_TAG:-ghcr.io/zangjiucheng/agentswarm:latest}"
 REMOTE_WORKER_IMAGE_TAG="${REMOTE_WORKER_IMAGE_TAG:-ghcr.io/zangjiucheng/agentswarm-worker:latest}"
-GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-$ROOT_DIR/.agentswarm}"
 
 get_current_branch() {
   git branch --show-current 2>/dev/null || true
@@ -68,7 +83,9 @@ if [ "$USE_REMOTE_IMAGES" -eq 1 ]; then
   append_unique_image "${WORKER_IMAGE_REPO}:${REMOTE_WORKER_IMAGE_DEFAULT_TAG}"
 fi
 
-"$ROOT_DIR/clean.sh"
+if [ "$HAS_LOCAL_CHECKOUT" -eq 1 ]; then
+  "$ROOT_DIR/clean.sh"
+fi
 
 if [ -d "$GENERATED_CONFIG_DIR" ]; then
   rm -f "$GENERATED_CONFIG_DIR/${CONTAINER_NAME}-config.json"
