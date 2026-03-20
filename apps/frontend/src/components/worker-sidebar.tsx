@@ -188,7 +188,9 @@ function SubWorkerItem({
         </p>
         <p className="mt-1 text-sm text-wrap">{worker.title}</p>
         <p className="mt-1 text-[11px] text-gray-500">
-          {formatVersionLabel(worker.createdWithVersion)} -> {formatVersionLabel(worker.currentAgentSwarmVersion)}
+          {formatVersionLabel(worker.createdWithVersion)}
+          {" -> "}
+          {formatVersionLabel(worker.currentAgentSwarmVersion)}
         </p>
       </Button>
       <WorkerControls
