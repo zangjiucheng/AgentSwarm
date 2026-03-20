@@ -1,11 +1,12 @@
 import type Docker from "dockerode"
-import { randomUUID } from "node:crypto"
+import { randomBytes, randomUUID } from "node:crypto"
 import { posix as pathPosix } from "node:path"
 import {
   docker,
   getPreset,
   readPublishedPort,
   WORKER_MONITOR_PORT,
+  WORKER_SSH_PORT,
   WORKER_WORKSPACE_VOLUME_LABEL,
   selfIp,
   WORKER_WEB_PORT,
@@ -61,6 +62,10 @@ function normalizeCloneRepositoryUrl(cloneRepositoryUrl?: string) {
 
 function createWorkspaceVolumeName() {
   return `agentswarm-worker-${randomUUID()}`
+}
+
+function createWorkerSshPassword() {
+  return randomBytes(18).toString("base64url")
 }
 
 function inferRepositoryDirectoryName(cloneRepositoryUrl: string) {
@@ -160,10 +165,15 @@ export async function startWorkerContainer({
       ? { ORCHESTRATOR_ADDRESS: selfIp, ORCHESTRATOR_PORT: String(port) }
       : {}
   const secretEnv = getWorkerSecretEnv({ accountId: githubAccountId })
+  const sshEnv = {
+    SSH_PORT: "2222",
+    WORKER_SSH_PASSWORD: env.WORKER_SSH_PASSWORD?.trim() || createWorkerSshPassword(),
+  }
   const mergedEnv = {
     ...orchestratorEnv,
     ...selectedPreset.presetEnv,
     ...secretEnv,
+    ...sshEnv,
     ...env,
     ...startupEnv,
   }
@@ -184,11 +194,13 @@ export async function startWorkerContainer({
     ExposedPorts: {
       [WORKER_WEB_PORT]: {},
       [WORKER_MONITOR_PORT]: {},
+      [WORKER_SSH_PORT]: {},
     },
     HostConfig: {
       PortBindings: {
         [WORKER_WEB_PORT]: [{ HostPort: "" }],
         [WORKER_MONITOR_PORT]: [{ HostPort: "" }],
+        [WORKER_SSH_PORT]: [{ HostPort: "" }],
       },
       Binds: [`${resolvedWorkspaceVolumeName}:${WORKSPACE_ROOT}`],
       ShmSize: SHARED_MEMORY_BYTES,

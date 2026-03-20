@@ -6,6 +6,7 @@ import {
   WORKER_MONITOR_PORT,
   WORKER_PARENT_LABEL,
   WORKER_PRESET_LABEL,
+  WORKER_SSH_PORT,
   WORKER_TITLE_LABEL,
 } from "./worker-container"
 import { getEffectiveGithubAccountForWorker } from "./secrets"
@@ -19,6 +20,7 @@ export type WorkerInfo = {
   status: "ready" | "error" | "stopped"
   port: number
   monitorPort: number
+  sshPort: number
   githubAccountId?: string
   githubAccountName?: string
   githubConfigured: boolean
@@ -106,6 +108,7 @@ async function loadWorkers(): Promise<WorkersResult> {
       const inspection = await inspectWorkerContainer(container.Id)
       const port = readPublishedPort(inspection)
       const monitorPort = readPublishedPort(inspection, WORKER_MONITOR_PORT)
+      const sshPort = readPublishedPort(inspection, WORKER_SSH_PORT)
       const monitorStatus = getContainerMonitorStatus(inspection)
       const githubAccount = getEffectiveGithubAccountForWorker(container.Id)
 
@@ -129,6 +132,7 @@ async function loadWorkers(): Promise<WorkersResult> {
           status: monitorStatus.status,
           port: port ?? 0,
           monitorPort: monitorPort ?? 0,
+          sshPort: sshPort ?? 0,
           githubAccountId: githubAccount.accountId,
           githubAccountName: githubAccount.account?.name,
           githubConfigured: githubAccount.githubConfigured,

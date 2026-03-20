@@ -78,6 +78,7 @@ RUN chmod +x /home/kasm-user/configure-github.sh /home/kasm-user/orchestrator.py
 ENV CODEX_WORKER=1
 
 EXPOSE 51300
+EXPOSE 2222
 
 HEALTHCHECK --interval=2s --timeout=2s --start-period=10s --retries=30 \
   CMD curl -fsS http://127.0.0.1:51300/ > /dev/null || exit 1

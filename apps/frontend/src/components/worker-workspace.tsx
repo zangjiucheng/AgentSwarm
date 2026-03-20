@@ -5,6 +5,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  Snippet,
 } from "@heroui/react"
 import {
   IconBrandGithub,
@@ -14,9 +15,10 @@ import {
   IconPlayerPlay,
   IconTrash,
 } from "@tabler/icons-react"
-import { useState } from "react"
-import type { GlobalSettings, WorkerInfo } from "../lib/api-types"
+import { useMemo, useState } from "react"
+import type { GlobalSettings, WorkerConnectionInfo, WorkerInfo } from "../lib/api-types"
 import { getWorkerIframeUrl } from "../lib/worker-urls"
+import { trpc } from "../trpc"
 import { WorkerGithubModal } from "./worker-github-modal"
 import { WorkerTerminalPanel } from "./worker-terminal-panel"
 
@@ -63,6 +65,31 @@ export function WorkerWorkspace({
   const isReady = worker.status === "ready"
   const isStopped = worker.status === "stopped"
   const workerUrl = getWorkerIframeUrl(worker.port)
+  const workerConnectionQuery = trpc.workerConnection.useQuery(
+    { id: worker.id },
+    {
+      enabled: state === "active",
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: false,
+    },
+  )
+
+  const sshDetails = useMemo(() => {
+    const connection = workerConnectionQuery.data as WorkerConnectionInfo | undefined
+
+    if (!connection?.available || connection.sshPort == null || connection.sshUser == null) {
+      return null
+    }
+
+    const host = window.location.hostname
+    const sshTarget = `${connection.sshUser}@${host}`
+    return {
+      command: `ssh ${sshTarget} -p ${connection.sshPort}`,
+      password: connection.sshPassword,
+      target: sshTarget,
+      workspaceDir: connection.workspaceDir ?? "/home/kasm-user/workers",
+    }
+  }, [workerConnectionQuery.data])
 
   const handleDestroy = async () => {
     setIsDestroying(true)
@@ -179,6 +206,44 @@ export function WorkerWorkspace({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col">
+          <div className="border-b border-gray-800 bg-[#222222] px-4 py-3">
+            {sshDetails ? (
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
+                <Snippet
+                  classNames={{
+                    base: "bg-default-100 items-start",
+                    pre: "whitespace-pre-wrap break-all font-mono text-xs",
+                  }}
+                  symbol=""
+                  variant="flat"
+                >
+                  {sshDetails.command}
+                </Snippet>
+                <Snippet
+                  classNames={{
+                    base: "bg-default-100 items-start",
+                    pre: "whitespace-pre-wrap break-all font-mono text-xs",
+                  }}
+                  symbol=""
+                  variant="flat"
+                >
+                  {sshDetails.password ?? "Password unavailable"}
+                </Snippet>
+                <div className="text-default-400 text-xs">
+                  <p>User: `kasm-user`</p>
+                  <p>Workspace: `{sshDetails.workspaceDir}`</p>
+                  <p>Use VS Code Remote-SSH with the command on the left.</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-default-500 text-xs">
+                {workerConnectionQuery.isLoading
+                  ? "Loading VS Code Remote-SSH connection details..."
+                  : "VS Code Remote-SSH is unavailable for this worker. Recreate or migrate older workers to enable SSH access."}
+              </p>
+            )}
+          </div>
+
           {hasWorkerPort && isReady ? (
             <iframe
               allow="clipboard-read; clipboard-write; fullscreen; self"

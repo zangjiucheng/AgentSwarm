@@ -6,11 +6,16 @@ HOME_DIR="/home/kasm-user"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME_DIR/workers}"
 CODE_SERVER_PORT="${CODE_SERVER_PORT:-51300}"
 MONITOR_PORT="${MONITOR_PORT:-51301}"
+SSH_PORT="${SSH_PORT:-2222}"
 STARTUP_REPO_URL="${STARTUP_REPO_URL:-}"
+WORKER_SSH_PASSWORD="${WORKER_SSH_PASSWORD:-}"
 BASH_BIN="$(readlink -f "$(command -v bash)")"
 SETPRIV_BIN="$(readlink -f "$(command -v setpriv)")"
 NIX_DAEMON_BIN="$(readlink -f "$(command -v nix-daemon)")"
 BUN_BIN="$(readlink -f "$(command -v bun)")"
+CHPASSWD_BIN="$(readlink -f "$(command -v chpasswd)")"
+SSHD_BIN="$(readlink -f "$(command -v sshd)")"
+SSH_KEYGEN_BIN="$(readlink -f "$(command -v ssh-keygen)")"
 MONITOR_SCRIPT="/usr/local/bin/monitor.js"
 BUN_PTY_LIB=""
 ARCH="$(uname -m)"
@@ -30,6 +35,7 @@ chown -R 1000:1000 "$HOME_DIR"
 NIX_DAEMON_PID=$!
 
 DOCKERD_PID=""
+SSHD_PID=""
 
 cleanup_docker_runtime_state() {
   local pid=""
@@ -75,7 +81,52 @@ else
   fi
 fi
 
+setup_sshd() {
+  mkdir -p /etc/ssh /run/sshd
+  chmod 755 /run/sshd
+
+  if [ -n "$WORKER_SSH_PASSWORD" ]; then
+    printf 'kasm-user:%s\n' "$WORKER_SSH_PASSWORD" | "$CHPASSWD_BIN"
+  fi
+
+  if [ ! -f /etc/ssh/ssh_host_ed25519_key ] || [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    "$SSH_KEYGEN_BIN" -A >/tmp/ssh-keygen.log 2>&1 || {
+      cat /tmp/ssh-keygen.log >&2 || true
+      return 1
+    }
+  fi
+
+  cat > /etc/ssh/sshd_config <<EOF
+Port $SSH_PORT
+ListenAddress 0.0.0.0
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+AllowUsers kasm-user
+AuthorizedKeysFile .ssh/authorized_keys
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+PasswordAuthentication yes
+PermitEmptyPasswords no
+PermitRootLogin no
+PidFile /run/sshd.pid
+PrintMotd no
+Subsystem sftp internal-sftp
+UsePAM no
+X11Forwarding no
+EOF
+
+  "$SSHD_BIN" -D -e -f /etc/ssh/sshd_config >/tmp/sshd.log 2>&1 &
+  SSHD_PID=$!
+}
+
+setup_sshd
+
 cleanup() {
+  if [ -n "$SSHD_PID" ] && kill -0 "$SSHD_PID" >/dev/null 2>&1; then
+    kill "$SSHD_PID" >/dev/null 2>&1 || true
+    wait "$SSHD_PID" 2>/dev/null || true
+  fi
+
   if kill -0 "$NIX_DAEMON_PID" >/dev/null 2>&1; then
     kill "$NIX_DAEMON_PID" >/dev/null 2>&1 || true
     wait "$NIX_DAEMON_PID" 2>/dev/null || true

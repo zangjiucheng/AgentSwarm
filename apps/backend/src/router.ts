@@ -18,7 +18,14 @@ import {
   saveGlobalSettings,
   setDefaultGithubAccount,
 } from "./secrets"
-import { getContainerEnv, resolveWorkerByIp, WORKER_PARENT_LABEL } from "./worker-container"
+import {
+  findManagedContainerById,
+  getContainerEnv,
+  readPublishedPort,
+  resolveWorkerByIp,
+  WORKER_PARENT_LABEL,
+  WORKER_SSH_PORT,
+} from "./worker-container"
 import {
   applyGithubAccountToWorker,
   applyGithubAccountsToRunningWorkers,
@@ -46,6 +53,7 @@ const workerSchema = z.object({
   status: workerStatusSchema,
   port: z.number(),
   monitorPort: z.number(),
+  sshPort: z.number(),
   githubAccountId: z.string().optional(),
   githubAccountName: z.string().optional(),
   githubConfigured: z.boolean(),
@@ -190,6 +198,49 @@ export const appRouter = router({
   workers: publicProcedure.output(workersSchema).query(async () => {
     return listWorkers()
   }),
+  workerConnection: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .output(
+      z.object({
+        available: z.boolean(),
+        sshPassword: z.string().nullable(),
+        sshPort: z.number().nullable(),
+        sshUser: z.string().nullable(),
+        workspaceDir: z.string().nullable(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const container = await findManagedContainerById(input.id)
+
+      if (!container) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `No managed worker found for id ${input.id}`,
+        })
+      }
+
+      const [inspection, env] = await Promise.all([
+        container.inspect(),
+        getContainerEnv(input.id),
+      ])
+
+      const sshPort = readPublishedPort(inspection, WORKER_SSH_PORT) ?? null
+      const sshPassword = env.WORKER_SSH_PASSWORD?.trim() || null
+      const workspaceDir = env.WORKSPACE_DIR?.trim() || "/home/kasm-user/workers"
+      const available = sshPort !== null && sshPassword !== null
+
+      return {
+        available,
+        sshPassword,
+        sshPort,
+        sshUser: available ? "kasm-user" : null,
+        workspaceDir: available ? workspaceDir : null,
+      }
+    }),
   stopWorker: publicProcedure
     .input(
       z.object({

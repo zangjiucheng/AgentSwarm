@@ -25,6 +25,7 @@ export type WorkerInfo = {
   durationS: number
   port: number
   monitorPort: number
+  sshPort: number
   createdAt: number
   githubAccountId?: string
   githubAccountName?: string
@@ -34,6 +35,14 @@ export type WorkerInfo = {
   status: WorkerStatus
   title: string
   usesDefaultGithubAccount: boolean
+}
+
+export type WorkerConnectionInfo = {
+  available: boolean
+  sshPassword: string | null
+  sshPort: number | null
+  sshUser: string | null
+  workspaceDir: string | null
 }
 
 export type WorkersResponse = {
