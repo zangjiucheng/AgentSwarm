@@ -31,6 +31,7 @@
           name = "agentswarm-worker-env";
           paths = with pkgs; [
             bashInteractive
+            binutils
             bun
             cacert
             code-server
@@ -39,19 +40,25 @@
             docker
             dropbear
             findutils
+            glibc
+            glibc.bin
             gawk
             gh
             git
             gnugrep
             gnused
             iptables
+            nix-ld
             nodejs_22
             ncurses
             openssh
+            patchelf
             procps
             python3
             ripgrep
             shadow
+            stdenv.cc.cc
+            stdenv.cc.cc.lib
             tmux
             util-linux
             which

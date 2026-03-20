@@ -43,7 +43,8 @@ function readEnv(name: string, fallback?: string) {
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const secretStorePath =
-  readEnv("SECRET_STORE_PATH", resolve(currentDir, "../data/secrets.json")) ??
+  readEnv("SECRET_STORE_PATH") ??
+  resolve(process.cwd(), "data/secrets.json") ??
   resolve(currentDir, "../data/secrets.json")
 
 let secretStore: SecretStore = loadSecretStore()

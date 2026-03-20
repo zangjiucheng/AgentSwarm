@@ -18,7 +18,6 @@ COPY --from=builder /app/apps/frontend/dist /app/apps/frontend/dist
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV FRONTEND_DIST=/app/apps/frontend/dist
-ENV SECRET_STORE_PATH=/app/data/secrets.json
 
 EXPOSE 3000
 
