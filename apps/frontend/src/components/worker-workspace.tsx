@@ -20,7 +20,7 @@ import {
 } from "@tabler/icons-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { GlobalSettings, WorkerConnectionInfo, WorkerInfo } from "../lib/api-types"
-import { getWorkerIframeUrl } from "../lib/worker-urls"
+import { getWorkerComputerUseUrl, getWorkerIframeUrl } from "../lib/worker-urls"
 import { trpc } from "../trpc"
 import { WorkerGithubModal } from "./worker-github-modal"
 import { WorkerTerminalPanel } from "./worker-terminal-panel"
@@ -191,16 +191,23 @@ export function WorkerWorkspace({
       ? "pointer-events-auto opacity-100"
       : "pointer-events-none opacity-0"
   const hasWorkerPort = worker.port > 0
+  const hasComputerUsePort = worker.vncPort > 0
   const isReady = worker.status === "ready"
   const isStopped = worker.status === "stopped"
   const workerUrl = getWorkerIframeUrl(worker.port)
   const workerConnectionQuery = trpc.workerConnection.useQuery(
     { id: worker.id },
     {
-      enabled: state === "active" && sshPanelOpen && worker.sshEnabled,
+      enabled:
+        state === "active" &&
+        ((sshPanelOpen && worker.sshEnabled) || worker.computerUseEnabled),
       refetchInterval: 10_000,
       refetchOnWindowFocus: false,
     },
+  )
+  const computerUseUrl = getWorkerComputerUseUrl(
+    worker.vncPort,
+    workerConnectionQuery.data?.vncPassword,
   )
 
   const sshDetails = useMemo(() => {
@@ -246,6 +253,12 @@ export function WorkerWorkspace({
       workspaceDir: connection.workspaceDir ?? "/home/kasm-user/workers",
     }
   }, [worker.id, workerConnectionQuery.data])
+
+  const workspaceUrl =
+    worker.computerUseEnabled && hasComputerUsePort ? computerUseUrl : workerUrl
+  const workspaceTitle = worker.computerUseEnabled
+    ? `${worker.title} computer use desktop`
+    : `${worker.title} code-server`
 
   const handleDestroy = async () => {
     setIsDestroying(true)
@@ -391,15 +404,17 @@ export function WorkerWorkspace({
           </Button>
           <Button
             as="a"
-            href={workerUrl}
-            isDisabled={!hasWorkerPort || !isReady}
+            href={workspaceUrl}
+            isDisabled={
+              !(worker.computerUseEnabled ? hasComputerUsePort : hasWorkerPort) || !isReady
+            }
             rel="noreferrer"
             size="sm"
             startContent={<IconExternalLink size={16} />}
             target="_blank"
             variant="light"
           >
-            Open in tab
+            {worker.computerUseEnabled ? "Open desktop" : "Open in tab"}
           </Button>
           <Button
             color="danger"
@@ -494,13 +509,22 @@ export function WorkerWorkspace({
             </div>
           ) : null}
 
-          {hasWorkerPort && isReady ? (
+          {worker.computerUseEnabled ? (
+            <div className="border-b border-gray-800 bg-[#1d1d1d] px-4 py-2 text-xs text-gray-300">
+              <span className="font-medium text-gray-100">Computer use mode</span>
+              {workerConnectionQuery.data?.vncPassword ? (
+                <span>{` · VNC password: ${workerConnectionQuery.data.vncPassword}`}</span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {(worker.computerUseEnabled ? hasComputerUsePort : hasWorkerPort) && isReady ? (
             <iframe
               allow="clipboard-read; clipboard-write; fullscreen; self"
               allowFullScreen
               className="min-h-0 flex-1 border-0 bg-[#282828]"
-              src={workerUrl}
-              title={`${worker.title} code-server`}
+              src={workspaceUrl}
+              title={workspaceTitle}
             />
           ) : isStopped ? (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-[#282828] px-6">
@@ -509,8 +533,9 @@ export function WorkerWorkspace({
                   Worker is stopped
                 </p>
                 <p className="text-default-500 mt-2 text-xs">
-                  Start this worker to relaunch its code-server session and reopen
-                  the persisted workspace.
+                  Start this worker to relaunch its
+                  {worker.computerUseEnabled ? " desktop and " : " "}
+                  code-server session and reopen the persisted workspace.
                 </p>
                 <Button
                   className="mt-4"
@@ -530,8 +555,9 @@ export function WorkerWorkspace({
                   Worker is not ready
                 </p>
                 <p className="text-default-500 mt-2 text-xs">
-                  The code-server endpoint is unavailable. Check the worker logs
-                  or Docker Desktop for the startup failure.
+                  The {worker.computerUseEnabled ? "desktop" : "code-server"} endpoint
+                  is unavailable. Check the worker logs or Docker Desktop for the
+                  startup failure.
                 </p>
               </div>
             </div>

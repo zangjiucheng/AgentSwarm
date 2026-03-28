@@ -7,6 +7,7 @@ export const docker = new Docker()
 export const WORKER_WEB_PORT = "51300/tcp"
 export const WORKER_MONITOR_PORT = "51301/tcp"
 export const WORKER_SSH_PORT = "2222/tcp"
+export const WORKER_VNC_PORT = "6901/tcp"
 export const WORKER_PRESET_LABEL = "agentswarm.preset"
 export const WORKER_TITLE_LABEL = "agentswarm.title"
 export const WORKER_PARENT_LABEL = "agentswarm.parent"

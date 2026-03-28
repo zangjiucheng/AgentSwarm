@@ -98,6 +98,7 @@ The runtime image already includes a default config, so mounting `apps/backend/c
 
 - Docker-hosted dashboard for creating and managing persistent workers
 - Browser-based `code-server` IDE for each worker
+- Optional lightweight desktop mode with browser VNC access for computer-use flows
 - Worker SSH access for VS Code Remote-SSH
 - Persistent workspace volumes with pause/start and migrate support
 - Dashboard-managed GitHub accounts and worker auto-pause settings

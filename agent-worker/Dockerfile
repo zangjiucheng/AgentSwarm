@@ -68,16 +68,20 @@ COPY --chown=1000:1000 agent-worker/zshrc /home/kasm-user/.zshrc
 COPY --chown=1000:1000 agent-worker/setup.sh /home/kasm-user/setup.sh
 COPY --chown=1000:1000 configure-github.sh /home/kasm-user/configure-github.sh
 COPY --chown=1000:1000 agent-worker/orchestrator.py /home/kasm-user/orchestrator.py
+COPY agent-worker/computer-use-start.sh /usr/local/bin/computer-use-start
 COPY --from=codex-installer /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=codex-installer /usr/local/bin/codex /usr/local/bin/codex
 COPY --from=monitor-builder /app/apps/monitor/dist/index.js /usr/local/bin/monitor.js
 COPY --from=monitor-builder /app/apps/monitor/dist/native /usr/local/lib/bun-pty
 COPY agent-worker/docker-entrypoint.sh /usr/local/bin/agent-worker-entrypoint
 
-RUN chmod +x /home/kasm-user/configure-github.sh /home/kasm-user/orchestrator.py /usr/local/bin/agent-worker-entrypoint \
+RUN chmod +x /home/kasm-user/configure-github.sh /home/kasm-user/orchestrator.py /usr/local/bin/agent-worker-entrypoint /usr/local/bin/computer-use-start \
     && ln -sf /home/kasm-user/configure-github.sh /usr/local/bin/configure-github \
     && mkdir -p /home/kasm-user/.cache/nix /home/kasm-user/.local/share/code-server/User /home/kasm-user/.local/share/code-server/extensions /home/kasm-user/Desktop /home/kasm-user/Downloads /home/kasm-user/Uploads /home/kasm-user/workers \
     && HOME=/home/kasm-user code-server --install-extension vscodevim.vim --extensions-dir /home/kasm-user/.local/share/code-server/extensions --force \
+    && mkdir -p /opt \
+    && novnc_dir="$(find /nix/store \( -path '*/share/novnc' -o -path '*/share/webapps/novnc' \) | head -n 1)" \
+    && if [ -n "$novnc_dir" ]; then ln -s "$novnc_dir" /opt/novnc; fi \
     && mkdir -p /nix/store /nix/var/log/nix /nix/var/nix/builds /nix/var/nix/db /nix/var/nix/daemon-socket /nix/var/nix/gcroots /nix/var/nix/profiles /nix/var/nix/temproots \
     && chown -R 1000:1000 /home/kasm-user /etc/nix /nix/var/nix/builds /nix/var/nix/db /nix/var/nix/gcroots /nix/var/nix/profiles /nix/var/nix/temproots /nix/var/log/nix \
     && chown 1000:1000 /nix/store /nix /nix/var /nix/var/nix
@@ -86,6 +90,7 @@ ENV CODEX_WORKER=1
 
 EXPOSE 51300
 EXPOSE 2222
+EXPOSE 6901
 
 HEALTHCHECK --interval=2s --timeout=2s --start-period=10s --retries=30 \
   CMD curl -fsS http://127.0.0.1:51300/ > /dev/null || exit 1

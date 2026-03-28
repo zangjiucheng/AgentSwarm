@@ -34,6 +34,8 @@ export type WorkerInfo = {
   monitorPort: number
   sshEnabled: boolean
   sshPort: number
+  computerUseEnabled: boolean
+  vncPort: number
   createdWithVersion: string
   currentAgentSwarmVersion: string
   workerImageTag: string
@@ -55,6 +57,8 @@ export type WorkerConnectionInfo = {
   sshPassword: string | null
   sshPort: number | null
   sshUser: string | null
+  vncPassword: string | null
+  vncPort: number | null
   workspaceDir: string | null
 }
 
@@ -66,6 +70,7 @@ export type WorkersResponse = {
 export type StartWorkerInput = {
   cloneRepositoryUrl?: string
   env: Record<string, string>
+  enableComputerUse?: boolean
   enableSsh?: boolean
   githubAccountId?: string
   preset: string

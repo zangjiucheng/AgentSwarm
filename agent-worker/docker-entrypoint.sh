@@ -11,6 +11,10 @@ STARTUP_REPO_URL="${STARTUP_REPO_URL:-}"
 WORKER_SSH_ENABLED="${WORKER_SSH_ENABLED:-0}"
 WORKER_SSH_AUTHORIZED_KEYS="${WORKER_SSH_AUTHORIZED_KEYS:-${WORKER_SSH_AUTHORIZED_KEY:-}}"
 WORKER_SSH_PASSWORD="${WORKER_SSH_PASSWORD:-}"
+WORKER_COMPUTER_USE_ENABLED="${WORKER_COMPUTER_USE_ENABLED:-0}"
+WORKER_VNC_PASSWORD="${WORKER_VNC_PASSWORD:-}"
+WORKER_VNC_PORT="${WORKER_VNC_PORT:-6901}"
+WORKER_VNC_RESOLUTION="${WORKER_VNC_RESOLUTION:-1440x900x24}"
 BASH_BIN="$(readlink -f "$(command -v bash)")"
 SETPRIV_BIN="$(readlink -f "$(command -v setpriv)")"
 NIX_DAEMON_BIN="$(readlink -f "$(command -v nix-daemon)")"
@@ -19,6 +23,7 @@ CHPASSWD_BIN="$(readlink -f "$(command -v chpasswd)")"
 SSHD_BIN="$(readlink -f "$(command -v sshd)")"
 SSH_KEYGEN_BIN="$(readlink -f "$(command -v ssh-keygen)")"
 MONITOR_SCRIPT="/usr/local/bin/monitor.js"
+COMPUTER_USE_SCRIPT="/usr/local/bin/computer-use-start"
 BUN_PTY_LIB=""
 ARCH="$(uname -m)"
 
@@ -530,9 +535,14 @@ exec "$SETPRIV_BIN" \
   STARTUP_REPO_URL="$STARTUP_REPO_URL" \
   CODE_SERVER_PORT="$CODE_SERVER_PORT" \
   MONITOR_PORT="$MONITOR_PORT" \
+  WORKER_COMPUTER_USE_ENABLED="$WORKER_COMPUTER_USE_ENABLED" \
+  WORKER_VNC_PASSWORD="$WORKER_VNC_PASSWORD" \
+  WORKER_VNC_PORT="$WORKER_VNC_PORT" \
+  WORKER_VNC_RESOLUTION="$WORKER_VNC_RESOLUTION" \
   BUN_BIN="$BUN_BIN" \
   BUN_PTY_LIB="$BUN_PTY_LIB" \
   MONITOR_SCRIPT="$MONITOR_SCRIPT" \
+  COMPUTER_USE_SCRIPT="$COMPUTER_USE_SCRIPT" \
   "$BASH_BIN" -lc '
     set -euo pipefail
 
@@ -700,6 +710,10 @@ EOF
     fi
 
     configure_github_auth
+
+    if [ "$WORKER_COMPUTER_USE_ENABLED" = "1" ]; then
+      "$COMPUTER_USE_SCRIPT"
+    fi
 
     "$BUN_BIN" "$MONITOR_SCRIPT" >/tmp/monitor.log 2>&1 &
 

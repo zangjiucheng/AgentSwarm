@@ -7,6 +7,7 @@ import {
   readPublishedPort,
   WORKER_MONITOR_PORT,
   WORKER_SSH_PORT,
+  WORKER_VNC_PORT,
   WORKER_WORKSPACE_VOLUME_LABEL,
   selfIp,
   currentAgentSwarmVersion,
@@ -32,6 +33,7 @@ type StartWorkerParams = {
   preset: string
   env: Record<string, string>
   enableSsh?: boolean
+  enableComputerUse?: boolean
   githubAccountId?: string
   cloneRepositoryUrl?: string
   labels?: Record<string, string>
@@ -70,6 +72,10 @@ function createWorkspaceVolumeName() {
 
 function createWorkerSshPassword() {
   return randomBytes(18).toString("base64url")
+}
+
+function createWorkerVncPassword() {
+  return randomBytes(12).toString("base64url")
 }
 
 function inferRepositoryDirectoryName(cloneRepositoryUrl: string) {
@@ -146,6 +152,7 @@ export async function startWorkerContainer({
   preset,
   env,
   enableSsh,
+  enableComputerUse,
   githubAccountId,
   cloneRepositoryUrl,
   labels,
@@ -171,6 +178,8 @@ export async function startWorkerContainer({
       : {}
   const secretEnv = getWorkerSecretEnv({ accountId: githubAccountId })
   const sshEnabled = enableSsh ?? env.WORKER_SSH_ENABLED === "1"
+  const computerUseEnabled =
+    enableComputerUse ?? env.WORKER_COMPUTER_USE_ENABLED === "1"
   const sshAuthorizedKeys =
     env.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
     secretEnv.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
@@ -191,12 +200,24 @@ export async function startWorkerContainer({
     : {
         WORKER_SSH_ENABLED: "0",
       }
+  const computerUseEnv = computerUseEnabled
+    ? {
+        DISPLAY: ":1",
+        WORKER_COMPUTER_USE_ENABLED: "1",
+        WORKER_VNC_PASSWORD:
+          env.WORKER_VNC_PASSWORD?.trim() || createWorkerVncPassword(),
+        WORKER_VNC_PORT: "6901",
+      }
+    : {
+        WORKER_COMPUTER_USE_ENABLED: "0",
+      }
   const mergedEnv = {
     ...orchestratorEnv,
     ...selectedPreset.presetEnv,
     ...secretEnv,
     ...env,
     ...sshEnv,
+    ...computerUseEnv,
     ...startupEnv,
   }
 
@@ -217,12 +238,14 @@ export async function startWorkerContainer({
       [WORKER_WEB_PORT]: {},
       [WORKER_MONITOR_PORT]: {},
       ...(sshEnabled ? { [WORKER_SSH_PORT]: {} } : {}),
+      ...(computerUseEnabled ? { [WORKER_VNC_PORT]: {} } : {}),
     },
     HostConfig: {
       PortBindings: {
         [WORKER_WEB_PORT]: [{ HostPort: "" }],
         [WORKER_MONITOR_PORT]: [{ HostPort: "" }],
         ...(sshEnabled ? { [WORKER_SSH_PORT]: [{ HostPort: "" }] } : {}),
+        ...(computerUseEnabled ? { [WORKER_VNC_PORT]: [{ HostPort: "" }] } : {}),
       },
       Binds: [`${resolvedWorkspaceVolumeName}:${WORKSPACE_ROOT}`],
       ShmSize: SHARED_MEMORY_BYTES,

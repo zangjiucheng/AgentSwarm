@@ -37,6 +37,7 @@ export function AddWorkerModal({
   const [presetName, setPresetName] = useState("")
   const [cloneRepositoryUrl, setCloneRepositoryUrl] = useState("")
   const [enableSsh, setEnableSsh] = useState(false)
+  const [enableComputerUse, setEnableComputerUse] = useState(false)
   const [githubAccountSelection, setGithubAccountSelection] =
     useState<string>("default")
   const [envValues, setEnvValues] = useState<Record<string, string>>({})
@@ -78,6 +79,7 @@ export function AddWorkerModal({
         selectedPreset.requiredEnv.map((key) => [key, envValues[key] ?? ""]),
       ),
       ...(enableSsh ? { enableSsh: true } : {}),
+      ...(enableComputerUse ? { enableComputerUse: true } : {}),
       ...(githubAccountSelection !== "default"
         ? { githubAccountId: githubAccountSelection }
         : {}),
@@ -93,6 +95,7 @@ export function AddWorkerModal({
     selectedPreset,
     envValues,
     enableSsh,
+    enableComputerUse,
     githubAccountSelection,
     cloneRepositoryUrl,
   ])
@@ -103,6 +106,7 @@ export function AddWorkerModal({
       setPresetName("")
       setCloneRepositoryUrl("")
       setEnableSsh(false)
+      setEnableComputerUse(false)
       setGithubAccountSelection("default")
       setEnvValues({})
       setShowLongLoadHint(false)
@@ -171,6 +175,14 @@ export function AddWorkerModal({
                 onValueChange={setEnableSsh}
               >
                 Enable SSH for VS Code Remote-SSH
+              </Checkbox>
+
+              <Checkbox
+                description="Starts a lightweight desktop inside the worker and exposes a browser VNC session for real-time interaction."
+                isSelected={enableComputerUse}
+                onValueChange={setEnableComputerUse}
+              >
+                Enable computer use mode
               </Checkbox>
 
               <Select
@@ -255,6 +267,7 @@ export function AddWorkerModal({
                     }
 
                     startWorker.mutate({
+                      ...(enableComputerUse ? { enableComputerUse: true } : {}),
                       ...(enableSsh ? { enableSsh: true } : {}),
                       ...(githubAccountSelection !== "default"
                         ? { githubAccountId: githubAccountSelection }

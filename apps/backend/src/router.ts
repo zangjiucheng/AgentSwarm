@@ -27,6 +27,7 @@ import {
   resolveWorkerByIp,
   WORKER_PARENT_LABEL,
   WORKER_SSH_PORT,
+  WORKER_VNC_PORT,
 } from "./worker-container"
 import {
   applyGithubAccountToWorker,
@@ -57,6 +58,8 @@ const workerSchema = z.object({
   monitorPort: z.number(),
   sshEnabled: z.boolean(),
   sshPort: z.number(),
+  computerUseEnabled: z.boolean(),
+  vncPort: z.number(),
   createdWithVersion: z.string(),
   currentAgentSwarmVersion: z.string(),
   workerImageTag: z.string(),
@@ -249,6 +252,8 @@ export const appRouter = router({
         sshPassword: z.string().nullable(),
         sshPort: z.number().nullable(),
         sshUser: z.string().nullable(),
+        vncPassword: z.string().nullable(),
+        vncPort: z.number().nullable(),
         workspaceDir: z.string().nullable(),
       }),
     )
@@ -273,8 +278,10 @@ export const appRouter = router({
         ""
       const sshPrivateKey = env.WORKER_SSH_PRIVATE_KEY?.trim() || null
       const sshPort = readPublishedPort(inspection, WORKER_SSH_PORT) ?? null
+      const vncPort = readPublishedPort(inspection, WORKER_VNC_PORT) ?? null
       const sshEnabled = env.WORKER_SSH_ENABLED === "1"
       const sshPassword = env.WORKER_SSH_PASSWORD?.trim() || null
+      const vncPassword = env.WORKER_VNC_PASSWORD?.trim() || null
       const workspaceDir = env.WORKSPACE_DIR?.trim() || "/home/kasm-user/workers"
       const sshAuthMode =
         sshPassword !== null
@@ -293,6 +300,8 @@ export const appRouter = router({
         sshPassword,
         sshPort,
         sshUser: available ? "kasm-user" : null,
+        vncPassword,
+        vncPort,
         workspaceDir: available ? workspaceDir : null,
       }
     }),
@@ -455,6 +464,7 @@ export const appRouter = router({
         preset: z.string(),
         env: z.record(z.string(), z.string()),
         enableSsh: z.boolean().optional(),
+        enableComputerUse: z.boolean().optional(),
         githubAccountId: z.string().trim().optional(),
         cloneRepositoryUrl: z.string().trim().min(1).optional(),
       }),

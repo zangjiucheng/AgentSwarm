@@ -37,6 +37,7 @@
             code-server
             coreutils
             curl
+            dbus
             docker
             dropbear
             findutils
@@ -52,16 +53,30 @@
             nodejs_22
             ncurses
             openssh
+            openbox
             patchelf
             procps
             python3
+            python3Packages.websockify
             ripgrep
+            scrot
             shadow
             stdenv.cc
             stdenv.cc.cc.lib
             tmux
             util-linux
+            novnc
+            wmctrl
             which
+            x11vnc
+            xdotool
+            xorg.xauth
+            xorg.xhost
+            xorg.xorgserver
+            xorg.xrandr
+            xorg.xset
+            xorg.xsetroot
+            xterm
             zsh
           ];
         };

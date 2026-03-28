@@ -40,6 +40,7 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "PATH",
     "PWD",
     "SHELL",
+    "DISPLAY",
     "SSH_PORT",
     "SHLVL",
     "USER",
@@ -48,6 +49,10 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "WORKER_SSH_ENABLED",
     "WORKER_SSH_PASSWORD",
     "WORKER_SSH_PRIVATE_KEY",
+    "WORKER_COMPUTER_USE_ENABLED",
+    "WORKER_VNC_PASSWORD",
+    "WORKER_VNC_PORT",
+    "WORKER_VNC_RESOLUTION",
     "WORKER_PROFILE",
   ]) {
     delete nextEnv[key]
@@ -135,7 +140,7 @@ export async function stopManagedWorkerContainer(id: string) {
 
 export async function replaceManagedWorkerContainer(
   id: string,
-  options?: { enableSsh?: boolean },
+  options?: { enableSsh?: boolean; enableComputerUse?: boolean },
 ) {
   const container = await findManagedContainerById(id)
 
@@ -164,6 +169,7 @@ export async function replaceManagedWorkerContainer(
   const githubAccountId = getStoredGithubAccountIdForWorker(id)
   const wasRunning = inspection.State.Running
   const currentSshEnabled = originalEnv.WORKER_SSH_ENABLED === "1"
+  const currentComputerUseEnabled = originalEnv.WORKER_COMPUTER_USE_ENABLED === "1"
 
   let replacement:
     | Awaited<ReturnType<typeof startWorkerContainer>>
@@ -175,6 +181,8 @@ export async function replaceManagedWorkerContainer(
 
   try {
     replacement = await startWorkerContainer({
+      enableComputerUse:
+        options?.enableComputerUse ?? currentComputerUseEnabled,
       enableSsh: options?.enableSsh ?? currentSshEnabled,
       env,
       githubAccountId,
