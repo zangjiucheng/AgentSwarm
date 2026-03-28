@@ -140,7 +140,7 @@ export function AddWorkerModal({
             <ModalHeader className="flex-col items-start gap-1">
               <span>New Worker</span>
               <span className="text-default-500 text-xs font-normal">
-                Default workspace stays on code-server. Computer use mode adds a separate desktop window.
+                Codex is preinstalled by default. code-server stays primary; computer use mode adds a separate desktop window.
               </span>
             </ModalHeader>
             <ModalBody className="min-h-0 gap-5 overflow-y-auto">
@@ -197,7 +197,7 @@ export function AddWorkerModal({
 
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-xs font-semibold tracking-[0.2em] uppercase text-default-400">
-                      Access
+                      Workspace Mode
                     </p>
                     <div className="mt-4 space-y-4">
                       <Checkbox
@@ -225,9 +225,16 @@ export function AddWorkerModal({
                           value={computerUseExtraFlakeRef}
                         />
                       ) : null}
+                    </div>
+                  </div>
 
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs font-semibold tracking-[0.2em] uppercase text-default-400">
+                      GitHub
+                    </p>
+                    <div className="mt-4 space-y-4">
                       <Select
-                        description="Optional. Choose a saved GitHub account now, or keep following the global default."
+                        description="Choose a saved account for this worker or keep following the global default."
                         label="GitHub Account"
                         onSelectionChange={(keys) => {
                           const nextKey =
@@ -256,7 +263,7 @@ export function AddWorkerModal({
                     </div>
                   </div>
 
-                  {selectedPreset ? (
+                  {selectedPreset && selectedPreset.requiredEnv.length > 0 ? (
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <p className="text-xs font-semibold tracking-[0.2em] uppercase text-default-400">
                         Required Environment
@@ -289,38 +296,65 @@ export function AddWorkerModal({
                     <p className="text-xs font-semibold tracking-[0.2em] uppercase text-emerald-300">
                       Launch Summary
                     </p>
-                    <div className="mt-4 space-y-3 text-sm text-default-200">
-                      <p>
-                        <span className="text-default-400">Preset:</span>{" "}
-                        {selectedPreset?.name ?? "Not selected"}
-                      </p>
-                      <p>
-                        <span className="text-default-400">Workspace:</span>{" "}
-                        code-server
-                        {enableComputerUse ? " + desktop" : ""}
-                      </p>
-                      {enableComputerUse ? (
-                        <p>
-                          <span className="text-default-400">Desktop env:</span>{" "}
-                          {computerUseExtraFlakeRef.trim()
-                            ? `default + ${computerUseExtraFlakeRef.trim()}`
-                            : "default flake"}
+                    <div className="mt-4 grid gap-3">
+                      <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-default-400">
+                          Main Workspace
                         </p>
+                        <p className="mt-1 text-sm text-default-100">code-server</p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-default-400">
+                          Desktop
+                        </p>
+                        <p className="mt-1 text-sm text-default-100">
+                          {enableComputerUse ? "Enabled after provisioning" : "Off"}
+                        </p>
+                        {enableComputerUse ? (
+                          <p className="mt-1 text-xs text-default-400">
+                            {computerUseExtraFlakeRef.trim()
+                              ? `Default flake + ${computerUseExtraFlakeRef.trim()}`
+                              : "Default computer-use flake"}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-default-400">
+                          Connectivity
+                        </p>
+                        <p className="mt-1 text-sm text-default-100">
+                          SSH {enableSsh ? "enabled" : "disabled"}
+                        </p>
+                        <p className="mt-1 text-xs text-default-400">
+                          {selectedGithubAccount
+                            ? `${selectedGithubAccount.name} (@${selectedGithubAccount.username})`
+                            : "GitHub follows default account"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-default-400">
+                          Source
+                        </p>
+                        <p className="mt-1 text-sm text-default-100">
+                          {cloneRepositoryUrl.trim() || "Empty workspace"}
+                        </p>
+                        <p className="mt-1 text-xs text-default-400">
+                          Preset: {selectedPreset?.name ?? "Not selected"}
+                        </p>
+                      </div>
+                      {selectedPreset && selectedPreset.requiredEnv.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-white/10 px-3 py-3 text-xs text-default-400">
+                          This preset does not require any extra environment variables.
+                        </div>
                       ) : null}
-                      <p>
-                        <span className="text-default-400">SSH:</span>{" "}
-                        {enableSsh ? "enabled" : "disabled"}
-                      </p>
-                      <p>
-                        <span className="text-default-400">GitHub:</span>{" "}
-                        {selectedGithubAccount
-                          ? `${selectedGithubAccount.name} (@${selectedGithubAccount.username})`
-                          : "follow default"}
-                      </p>
-                      <p>
-                        <span className="text-default-400">Repository:</span>{" "}
-                        {cloneRepositoryUrl.trim() || "empty workspace"}
-                      </p>
+                      <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-default-400">
+                          Default Tools
+                        </p>
+                        <p className="mt-1 text-sm text-default-100">
+                          Codex, terminal, git, code-server
+                        </p>
+                      </div>
                     </div>
                   </div>
 
