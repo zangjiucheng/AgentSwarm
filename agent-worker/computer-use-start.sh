@@ -6,7 +6,10 @@ WORKER_HOME_DIR="${WORKER_HOME_DIR:-${HOME:-/home/kasm-user}}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$WORKER_HOME_DIR/workers}"
 DISPLAY_VALUE="${DISPLAY:-:1}"
 COMPUTER_USE_STATE_DIR="$WORKER_HOME_DIR/.agentswarm/computer-use"
-COMPUTER_USE_PROFILE="$WORKER_HOME_DIR/.agentswarm/profiles/computer-use"
+COMPUTER_USE_PROFILES_DIR="$WORKER_HOME_DIR/.agentswarm/profiles"
+COMPUTER_USE_PROFILE="$COMPUTER_USE_PROFILES_DIR/computer-use"
+COMPUTER_USE_DEFAULT_LINK="$COMPUTER_USE_PROFILES_DIR/computer-use-default"
+COMPUTER_USE_EXTRA_LINK="$COMPUTER_USE_PROFILES_DIR/computer-use-extra"
 COMPUTER_USE_STAMP_FILE="$COMPUTER_USE_STATE_DIR/flake-ref"
 DEFAULT_COMPUTER_USE_FLAKE="${WORKER_COMPUTER_USE_FLAKE:-/opt/agent-worker-flake#computerUseEnv}"
 EXTRA_COMPUTER_USE_FLAKE="${WORKER_COMPUTER_USE_EXTRA_FLAKE_REF:-}"
@@ -21,6 +24,7 @@ VNC_PORT="${WORKER_VNC_PORT:-6901}"
 VNC_PASSWORD="${WORKER_VNC_PASSWORD:-computer-use}"
 VNC_SCREEN="${WORKER_VNC_RESOLUTION:-1440x900x24}"
 X11VNC_PORT="${WORKER_X11VNC_PORT:-5900}"
+NIX_DAEMON_SOCKET="${NIX_DAEMON_SOCKET:-/nix/var/nix/daemon-socket/socket}"
 
 mkdir -p "$COMPUTER_USE_STATE_DIR" "$(dirname "$COMPUTER_USE_PROFILE")"
 : > "$LOG_FILE"
@@ -120,8 +124,12 @@ find_novnc_web_root() {
 
   for candidate in \
     "${NOVNC_WEB_ROOT:-}" \
-      "$COMPUTER_USE_PROFILE/share/novnc" \
-      "$COMPUTER_USE_PROFILE/share/webapps/novnc" \
+    "$COMPUTER_USE_EXTRA_LINK/share/novnc" \
+    "$COMPUTER_USE_EXTRA_LINK/share/webapps/novnc" \
+    "$COMPUTER_USE_DEFAULT_LINK/share/novnc" \
+    "$COMPUTER_USE_DEFAULT_LINK/share/webapps/novnc" \
+    "$COMPUTER_USE_PROFILE/share/novnc" \
+    "$COMPUTER_USE_PROFILE/share/webapps/novnc" \
     /opt/novnc \
     /usr/share/novnc \
     /usr/share/webapps/novnc \
@@ -153,6 +161,21 @@ wait_for_x_display() {
     fi
     sleep 1
   done
+}
+
+wait_for_nix_daemon() {
+  local attempt=0
+
+  until [ -S "$NIX_DAEMON_SOCKET" ]; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 30 ]; then
+      echo "Timed out waiting for Nix daemon socket at $NIX_DAEMON_SOCKET" >&2
+      return 1
+    fi
+    sleep 1
+  done
+
+  sleep 1
 }
 
 launch_terminal() {
@@ -200,9 +223,29 @@ start_desktop_session() {
 }
 
 activate_computer_use_profile() {
-  local next_path="$COMPUTER_USE_PROFILE/bin:$COMPUTER_USE_PROFILE/sbin"
+  local next_path="$PATH"
 
-  export PATH="$next_path:$PATH"
+  next_path="$(append_profile_path "$next_path" "$COMPUTER_USE_DEFAULT_LINK")"
+  next_path="$(append_profile_path "$next_path" "$COMPUTER_USE_EXTRA_LINK")"
+  next_path="$(append_profile_path "$next_path" "$COMPUTER_USE_PROFILE")"
+
+  export PATH="$next_path"
+}
+
+append_profile_path() {
+  local current_path="$1"
+  local profile_dir="$2"
+  local next_path="$current_path"
+
+  if [ -d "$profile_dir/bin" ]; then
+    next_path="$profile_dir/bin:$next_path"
+  fi
+
+  if [ -d "$profile_dir/sbin" ]; then
+    next_path="$profile_dir/sbin:$next_path"
+  fi
+
+  printf '%s' "$next_path"
 }
 
 prepare_flake_environment() {
@@ -213,35 +256,39 @@ prepare_flake_environment() {
     current_stamp="$(cat "$COMPUTER_USE_STAMP_FILE")"
   fi
 
-  if [ -d "$COMPUTER_USE_PROFILE/bin" ] && [ "$requested_stamp" = "$current_stamp" ]; then
+  if [ -d "$COMPUTER_USE_DEFAULT_LINK" ] && [ "$requested_stamp" = "$current_stamp" ]; then
     echo "Reusing existing computer-use profile"
     activate_computer_use_profile
     return 0
   fi
 
-  rm -rf "$COMPUTER_USE_PROFILE"
-  mkdir -p "$(dirname "$COMPUTER_USE_PROFILE")"
+  rm -rf "$COMPUTER_USE_PROFILE" "$COMPUTER_USE_DEFAULT_LINK" "$COMPUTER_USE_EXTRA_LINK"
+  mkdir -p "$COMPUTER_USE_PROFILES_DIR"
 
   export NIX_CONFIG="$(printf '%s\n%s\n' "${NIX_CONFIG:-}" 'filter-syscalls = false')"
-  unset NIX_REMOTE
+  wait_for_nix_daemon || fail "Nix daemon is not ready for computer use mode"
 
   echo "Installing default computer-use environment from ${DEFAULT_COMPUTER_USE_FLAKE}"
-  nix profile install \
+  HOME=/root NIX_REMOTE=daemon nix build \
     --accept-flake-config \
-    --profile "$COMPUTER_USE_PROFILE" \
+    --out-link "$COMPUTER_USE_DEFAULT_LINK" \
     "$DEFAULT_COMPUTER_USE_FLAKE"
 
   if [ -n "$EXTRA_COMPUTER_USE_FLAKE" ]; then
     echo "Installing extra computer-use environment from ${EXTRA_COMPUTER_USE_FLAKE}"
-    nix profile install \
+    HOME=/root NIX_REMOTE=daemon nix build \
       --accept-flake-config \
-      --profile "$COMPUTER_USE_PROFILE" \
+      --out-link "$COMPUTER_USE_EXTRA_LINK" \
       "$EXTRA_COMPUTER_USE_FLAKE"
   fi
 
+  ln -sfn "$COMPUTER_USE_DEFAULT_LINK" "$COMPUTER_USE_PROFILE"
+
   printf '%s\n' "$requested_stamp" > "$COMPUTER_USE_STAMP_FILE"
-  chown -R "$WORKER_UID:$WORKER_GID" "$COMPUTER_USE_STATE_DIR" "$(dirname "$COMPUTER_USE_PROFILE")"
+  chown -R "$WORKER_UID:$WORKER_GID" "$COMPUTER_USE_STATE_DIR" "$COMPUTER_USE_PROFILES_DIR"
   chown -h "$WORKER_UID:$WORKER_GID" "$COMPUTER_USE_PROFILE" 2>/dev/null || true
+  chown -h "$WORKER_UID:$WORKER_GID" "$COMPUTER_USE_DEFAULT_LINK" 2>/dev/null || true
+  chown -h "$WORKER_UID:$WORKER_GID" "$COMPUTER_USE_EXTRA_LINK" 2>/dev/null || true
   activate_computer_use_profile
 }
 

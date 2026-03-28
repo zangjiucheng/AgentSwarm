@@ -5,6 +5,7 @@ const COMPUTER_USE_STATE_DIR = "/home/kasm-user/.agentswarm/computer-use"
 const COMPUTER_USE_STATUS_FILE = `${COMPUTER_USE_STATE_DIR}/status`
 const COMPUTER_USE_ERROR_FILE = `${COMPUTER_USE_STATE_DIR}/error`
 const COMPUTER_USE_LOG_FILE = `${COMPUTER_USE_STATE_DIR}/provision.log`
+const COMPUTER_USE_EXEC_TIMEOUT_MS = 1_500
 
 export type ComputerUseStatus = "disabled" | "preparing" | "ready" | "error"
 
@@ -94,17 +95,24 @@ export async function readComputerUseState(input: {
   }
 
   try {
-    const output = await execCapture(input.containerId, [
-      "sh",
-      "-lc",
-      `
-        printf '__STATUS__\\n'
-        cat "${COMPUTER_USE_STATUS_FILE}" 2>/dev/null || true
-        printf '\\n__ERROR__\\n'
-        cat "${COMPUTER_USE_ERROR_FILE}" 2>/dev/null || true
-        printf '\\n__LOG__\\n'
-        tail -n 80 "${COMPUTER_USE_LOG_FILE}" 2>/dev/null || true
-      `,
+    const output = await Promise.race([
+      execCapture(input.containerId, [
+        "sh",
+        "-lc",
+        `
+          printf '__STATUS__\\n'
+          cat "${COMPUTER_USE_STATUS_FILE}" 2>/dev/null || true
+          printf '\\n__ERROR__\\n'
+          cat "${COMPUTER_USE_ERROR_FILE}" 2>/dev/null || true
+          printf '\\n__LOG__\\n'
+          tail -n 80 "${COMPUTER_USE_LOG_FILE}" 2>/dev/null || true
+        `,
+      ]),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Timed out reading computer use state"))
+        }, COMPUTER_USE_EXEC_TIMEOUT_MS)
+      }),
     ])
 
     const rawStatus = parseSection(output.stdout, "__STATUS__")
@@ -130,7 +138,7 @@ export async function readComputerUseState(input: {
           ? error.message
           : "Failed to read computer use state",
       log: null,
-      status: "error",
+      status: "preparing",
     } satisfies ComputerUseState
   }
 }
