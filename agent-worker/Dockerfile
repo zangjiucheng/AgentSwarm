@@ -87,9 +87,21 @@ RUN apt-get update \
     && rm -f /tmp/code-server.tar.gz \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --gid 1000 kasm-user \
-    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash kasm-user \
-    && groupadd --gid 1001 docker \
+RUN EXISTING_GROUP="$(getent group 1000 | cut -d: -f1 || true)" \
+    && if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "kasm-user" ]; then \
+         groupmod -n kasm-user "$EXISTING_GROUP"; \
+       elif [ -z "$EXISTING_GROUP" ]; then \
+         groupadd --gid 1000 kasm-user; \
+       fi \
+    && EXISTING_USER="$(getent passwd 1000 | cut -d: -f1 || true)" \
+    && if [ -n "$EXISTING_USER" ] && [ "$EXISTING_USER" != "kasm-user" ]; then \
+         usermod -l kasm-user -d /home/kasm-user -m -g 1000 -s /bin/bash "$EXISTING_USER"; \
+       elif [ -z "$EXISTING_USER" ]; then \
+         useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash kasm-user; \
+       fi \
+    && if ! getent group docker >/dev/null 2>&1; then \
+         groupadd --gid 1001 docker; \
+       fi \
     && usermod -aG docker,sudo kasm-user \
     && printf '%s\n' 'kasm-user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/kasm-user \
     && chmod 440 /etc/sudoers.d/kasm-user
