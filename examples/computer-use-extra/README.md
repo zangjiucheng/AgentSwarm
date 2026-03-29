@@ -1,10 +1,10 @@
-Example extra flake for AgentSwarm computer-use workers.
+Example extra setup script for AgentSwarm computer-use workers.
 
-Use it as a reference if you do not want to maintain your own flake yet.
+Use it as a reference if you do not want to maintain your own startup customization yet.
 
-Example ref:
+Example value:
 
-`github:zangjiucheng/AgentSwarm?dir=examples/computer-use-extra#computerUseEnv`
+`./examples/computer-use-extra/setup.sh`
 
 This sample adds:
 

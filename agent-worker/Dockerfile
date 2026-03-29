@@ -21,43 +21,72 @@ ARG CODEX_VERSION
 
 RUN npm install -g --unsafe-perm "@openai/codex@${CODEX_VERSION}"
 
-FROM nixos/nix:latest
+FROM node:22-bookworm-slim
 
 ARG CODEX_VERSION
 
+ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/home/kasm-user
-ENV WORKER_PROFILE=/nix/var/nix/profiles/agentswarm-worker
-ENV SHELL=/nix/var/nix/profiles/agentswarm-worker/bin/bash
+ENV SHELL=/bin/bash
 ENV NPM_CONFIG_PREFIX=/home/kasm-user/.local
-ENV PATH="/home/kasm-user/.local/bin:/nix/var/nix/profiles/agentswarm-worker/bin:/nix/var/nix/profiles/agentswarm-worker/sbin:$PATH"
+ENV PATH="/home/kasm-user/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV CODEX_VERSION=$CODEX_VERSION
 
-RUN mkdir -p /etc/nix \
-    && printf '%s\n' \
-      'experimental-features = nix-command flakes' \
-      'build-users-group =' \
-      'trusted-users = root kasm-user' \
-      'allowed-users = *' \
-      > /etc/nix/nix.conf
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      bash \
+      ca-certificates \
+      chromium \
+      curl \
+      dbus-x11 \
+      docker.io \
+      git \
+      gh \
+      jq \
+      openssh-client \
+      openssh-server \
+      procps \
+      python3 \
+      python3-websockify \
+      ripgrep \
+      scrot \
+      sudo \
+      tmux \
+      util-linux \
+      wmctrl \
+      x11-utils \
+      x11vnc \
+      xauth \
+      xdotool \
+      xterm \
+      xvfb \
+      xfce4 \
+      xfce4-terminal \
+      xfce4-panel \
+      xfce4-session \
+      xfce4-settings \
+      xfdesktop4 \
+      xfwm4 \
+      thunar \
+      openbox \
+      novnc \
+      zsh \
+    && npm install -g code-server \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY agent-worker/flake.nix agent-worker/flake.lock /tmp/agent-worker/
+RUN groupadd --gid 1000 kasm-user \
+    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash kasm-user \
+    && groupadd --gid 1001 docker \
+    && usermod -aG docker,sudo kasm-user \
+    && printf '%s\n' 'kasm-user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/kasm-user \
+    && chmod 440 /etc/sudoers.d/kasm-user
 
-# QEMU-based multi-arch builds in GitHub Actions can reject Nix's seccomp filter setup.
-RUN NIX_CONFIG='filter-syscalls = false' \
-    nix profile add --profile "$WORKER_PROFILE" --accept-flake-config /tmp/agent-worker
-
-RUN printf '%s\n' \
-      'root:x:0:0:System administrator:/root:/nix/var/nix/profiles/agentswarm-worker/bin/bash' \
-      'kasm-user:x:1000:1000:AgentSwarm worker:/home/kasm-user:/nix/var/nix/profiles/agentswarm-worker/bin/bash' \
-      > /etc/passwd \
-    && printf '%s\n' \
-      'root:x:0:' \
-      'kasm-user:x:1000:' \
-      'docker:x:1001:kasm-user' \
-      > /etc/group
-
-RUN mkdir -p /usr/local/bin \
-    && ln -sf /root/.nix-profile/bin/nix-daemon /usr/local/bin/nix-daemon
+COPY --from=monitor-builder /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=monitor-builder /usr/local/bin/bunx /usr/local/bin/bunx
+COPY --from=monitor-builder /app/apps/monitor/dist/index.js /usr/local/bin/monitor.js
+COPY --from=monitor-builder /app/apps/monitor/dist/native /usr/local/lib/bun-pty
+COPY --from=codex-installer /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=codex-installer /usr/local/bin/codex /usr/local/bin/codex
 
 COPY --chown=1000:1000 agent-worker/dot_codex /home/kasm-user/.codex
 COPY --chown=1000:1000 agent-worker/dot_agent/skills /home/kasm-user/.codex/skills
@@ -68,21 +97,28 @@ COPY --chown=1000:1000 agent-worker/zshrc /home/kasm-user/.zshrc
 COPY --chown=1000:1000 agent-worker/setup.sh /home/kasm-user/setup.sh
 COPY --chown=1000:1000 configure-github.sh /home/kasm-user/configure-github.sh
 COPY --chown=1000:1000 agent-worker/orchestrator.py /home/kasm-user/orchestrator.py
-COPY agent-worker/flake.nix agent-worker/flake.lock /opt/agent-worker-flake/
 COPY agent-worker/computer-use-start.sh /usr/local/bin/computer-use-start
-COPY --from=codex-installer /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=codex-installer /usr/local/bin/codex /usr/local/bin/codex
-COPY --from=monitor-builder /app/apps/monitor/dist/index.js /usr/local/bin/monitor.js
-COPY --from=monitor-builder /app/apps/monitor/dist/native /usr/local/lib/bun-pty
 COPY agent-worker/docker-entrypoint.sh /usr/local/bin/agent-worker-entrypoint
 
-RUN chmod +x /home/kasm-user/configure-github.sh /home/kasm-user/orchestrator.py /usr/local/bin/agent-worker-entrypoint /usr/local/bin/computer-use-start \
+RUN chmod +x \
+      /home/kasm-user/configure-github.sh \
+      /home/kasm-user/orchestrator.py \
+      /usr/local/bin/agent-worker-entrypoint \
+      /usr/local/bin/computer-use-start \
     && ln -sf /home/kasm-user/configure-github.sh /usr/local/bin/configure-github \
-    && mkdir -p /home/kasm-user/.cache/nix /home/kasm-user/.local/share/code-server/User /home/kasm-user/.local/share/code-server/extensions /home/kasm-user/Desktop /home/kasm-user/Downloads /home/kasm-user/Uploads /home/kasm-user/workers \
+    && mkdir -p \
+      /home/kasm-user/.cache \
+      /home/kasm-user/.local/bin \
+      /home/kasm-user/.local/share/code-server/User \
+      /home/kasm-user/.local/share/code-server/extensions \
+      /home/kasm-user/Desktop \
+      /home/kasm-user/Downloads \
+      /home/kasm-user/Uploads \
+      /home/kasm-user/workers \
+      /var/run \
+      /var/lib/docker \
     && HOME=/home/kasm-user code-server --install-extension vscodevim.vim --extensions-dir /home/kasm-user/.local/share/code-server/extensions --force \
-    && mkdir -p /nix/store /nix/var/log/nix /nix/var/nix/builds /nix/var/nix/db /nix/var/nix/daemon-socket /nix/var/nix/gcroots /nix/var/nix/profiles /nix/var/nix/temproots \
-    && chown -R 1000:1000 /home/kasm-user /etc/nix /nix/var/nix/builds /nix/var/nix/db /nix/var/nix/gcroots /nix/var/nix/profiles /nix/var/nix/temproots /nix/var/log/nix \
-    && chown 1000:1000 /nix/store /nix /nix/var /nix/var/nix
+    && chown -R 1000:1000 /home/kasm-user
 
 ENV CODEX_WORKER=1
 

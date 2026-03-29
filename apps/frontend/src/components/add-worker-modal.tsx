@@ -38,7 +38,7 @@ export function AddWorkerModal({
   const [cloneRepositoryUrl, setCloneRepositoryUrl] = useState("")
   const [enableSsh, setEnableSsh] = useState(false)
   const [enableComputerUse, setEnableComputerUse] = useState(false)
-  const [computerUseExtraFlakeRef, setComputerUseExtraFlakeRef] = useState("")
+  const [computerUseExtraSetupScript, setComputerUseExtraSetupScript] = useState("")
   const [githubAccountSelection, setGithubAccountSelection] =
     useState<string>("default")
   const [envValues, setEnvValues] = useState<Record<string, string>>({})
@@ -85,8 +85,8 @@ export function AddWorkerModal({
       ),
       ...(enableSsh ? { enableSsh: true } : {}),
       ...(enableComputerUse ? { enableComputerUse: true } : {}),
-      ...(enableComputerUse && computerUseExtraFlakeRef.trim()
-        ? { computerUseExtraFlakeRef: computerUseExtraFlakeRef.trim() }
+      ...(enableComputerUse && computerUseExtraSetupScript.trim()
+        ? { computerUseExtraSetupScript: computerUseExtraSetupScript.trim() }
         : {}),
       ...(githubAccountSelection !== "default"
         ? { githubAccountId: githubAccountSelection }
@@ -104,7 +104,7 @@ export function AddWorkerModal({
     envValues,
     enableSsh,
     enableComputerUse,
-    computerUseExtraFlakeRef,
+    computerUseExtraSetupScript,
     githubAccountSelection,
     cloneRepositoryUrl,
   ])
@@ -116,7 +116,7 @@ export function AddWorkerModal({
       setCloneRepositoryUrl("")
       setEnableSsh(false)
       setEnableComputerUse(false)
-      setComputerUseExtraFlakeRef("")
+      setComputerUseExtraSetupScript("")
       setGithubAccountSelection("default")
       setEnvValues({})
       setShowLongLoadHint(false)
@@ -209,7 +209,7 @@ export function AddWorkerModal({
                       </Checkbox>
 
                       <Checkbox
-                        description="Adds a desktop session, browser, and computer-use tools during startup. The main workspace still opens in code-server."
+                        description="Adds a desktop session, browser, and computer-use tools. The main workspace still opens in code-server."
                         isSelected={enableComputerUse}
                         onValueChange={setEnableComputerUse}
                       >
@@ -218,11 +218,11 @@ export function AddWorkerModal({
 
                       {enableComputerUse ? (
                         <Input
-                          description="Optional. Extra flake ref installed after the default computer-use environment. Example: github:zangjiucheng/AgentSwarm?dir=examples/computer-use-extra#computerUseEnv"
-                          label="Extra computer-use flake"
-                          onValueChange={setComputerUseExtraFlakeRef}
-                          placeholder="github:zangjiucheng/AgentSwarm?dir=examples/computer-use-extra#computerUseEnv"
-                          value={computerUseExtraFlakeRef}
+                          description="Optional. Run an extra setup script after the default computer-use tools are ready. Supports a workspace path or an https URL."
+                          label="Extra computer-use setup script"
+                          onValueChange={setComputerUseExtraSetupScript}
+                          placeholder="./.agentswarm/computer-use-setup.sh or https://example.com/setup.sh"
+                          value={computerUseExtraSetupScript}
                         />
                       ) : null}
                     </div>
@@ -312,9 +312,9 @@ export function AddWorkerModal({
                         </p>
                         {enableComputerUse ? (
                           <p className="mt-1 text-xs text-default-400">
-                            {computerUseExtraFlakeRef.trim()
-                              ? `Default flake + ${computerUseExtraFlakeRef.trim()}`
-                              : "Default computer-use flake"}
+                            {computerUseExtraSetupScript.trim()
+                              ? `Default desktop setup + ${computerUseExtraSetupScript.trim()}`
+                              : "Default desktop setup"}
                           </p>
                         ) : null}
                       </div>
@@ -393,8 +393,8 @@ export function AddWorkerModal({
 
                     startWorker.mutate({
                       ...(enableComputerUse ? { enableComputerUse: true } : {}),
-                      ...(enableComputerUse && computerUseExtraFlakeRef.trim()
-                        ? { computerUseExtraFlakeRef: computerUseExtraFlakeRef.trim() }
+                      ...(enableComputerUse && computerUseExtraSetupScript.trim()
+                        ? { computerUseExtraSetupScript: computerUseExtraSetupScript.trim() }
                         : {}),
                       ...(enableSsh ? { enableSsh: true } : {}),
                       ...(githubAccountSelection !== "default"

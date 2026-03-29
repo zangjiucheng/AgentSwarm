@@ -65,6 +65,7 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "WORKER_SSH_PASSWORD",
     "WORKER_SSH_PRIVATE_KEY",
     "WORKER_COMPUTER_USE_ENABLED",
+    "WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT",
     "WORKER_COMPUTER_USE_EXTRA_FLAKE_REF",
     "WORKER_VNC_PASSWORD",
     "WORKER_VNC_PORT",
@@ -187,6 +188,9 @@ export async function replaceManagedWorkerContainer(
   const wasRunning = inspection.State.Running
   const currentSshEnabled = originalEnv.WORKER_SSH_ENABLED === "1"
   const currentComputerUseEnabled = originalEnv.WORKER_COMPUTER_USE_ENABLED === "1"
+  const currentComputerUseExtraSetupScript =
+    originalEnv.WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT ??
+    originalEnv.WORKER_COMPUTER_USE_EXTRA_FLAKE_REF
 
   let replacement:
     | Awaited<ReturnType<typeof startWorkerContainer>>
@@ -200,6 +204,7 @@ export async function replaceManagedWorkerContainer(
     replacement = await startWorkerContainer({
       enableComputerUse:
         options?.enableComputerUse ?? currentComputerUseEnabled,
+      computerUseExtraSetupScript: currentComputerUseExtraSetupScript,
       enableSsh: options?.enableSsh ?? currentSshEnabled,
       env,
       githubAccountId,

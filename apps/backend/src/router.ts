@@ -503,6 +503,7 @@ export const appRouter = router({
         env: z.record(z.string(), z.string()),
         enableSsh: z.boolean().optional(),
         enableComputerUse: z.boolean().optional(),
+        computerUseExtraSetupScript: z.string().trim().min(1).optional(),
         computerUseExtraFlakeRef: z.string().trim().min(1).optional(),
         githubAccountId: z.string().trim().optional(),
         cloneRepositoryUrl: z.string().trim().min(1).optional(),

@@ -619,7 +619,7 @@ export function WorkerWorkspace({
               </p>
               <p className="mt-1 text-xs text-gray-400">
                 {computerUsePreparing
-                  ? "Desktop packages are being provisioned from the configured flake outputs. code-server stays available while this finishes."
+                  ? "Desktop packages and optional setup scripts are being provisioned. code-server stays available while this finishes."
                   : workerConnectionQuery.data?.computerUseError ??
                     "Open desktop will remain unavailable until provisioning succeeds."}
               </p>

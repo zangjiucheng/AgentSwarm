@@ -92,19 +92,19 @@ When using `./run.sh --remote-images`, presets are rewritten to point to `ghcr.i
 
 ## Worker Image
 
-The worker image is Nix-based:
+The worker image is Debian-based:
 
-- toolchain definition: [`agent-worker/flake.nix`](./agent-worker/flake.nix)
-- pinned inputs: [`agent-worker/flake.lock`](./agent-worker/flake.lock)
+- runtime image definition: [`agent-worker/Dockerfile`](./agent-worker/Dockerfile)
+- worker entrypoint: [`agent-worker/docker-entrypoint.sh`](./agent-worker/docker-entrypoint.sh)
 
-### Extra Computer-Use Flake
+### Extra Computer-Use Setup Script
 
-Computer-use mode installs a default desktop/tooling flake during worker startup. You can optionally layer an extra flake ref on top.
+Computer-use mode ships with a default desktop/browser/tooling stack in the worker image. You can optionally run an extra setup script during startup to add project-specific tools or configuration.
 
-If you do not want to maintain your own flake yet, use the sample in this repo:
+If you do not want to maintain your own setup script yet, use the sample in this repo:
 
-- example ref: `github:zangjiucheng/AgentSwarm?dir=examples/computer-use-extra#computerUseEnv`
-- sample files: [`examples/computer-use-extra/flake.nix`](./examples/computer-use-extra/flake.nix) and [`examples/computer-use-extra/README.md`](./examples/computer-use-extra/README.md)
+- example value: `./examples/computer-use-extra/setup.sh`
+- sample files: [`examples/computer-use-extra/setup.sh`](./examples/computer-use-extra/setup.sh) and [`examples/computer-use-extra/README.md`](./examples/computer-use-extra/README.md)
 
 ## Notes
 

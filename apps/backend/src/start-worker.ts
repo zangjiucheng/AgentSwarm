@@ -34,6 +34,7 @@ type StartWorkerParams = {
   env: Record<string, string>
   enableSsh?: boolean
   enableComputerUse?: boolean
+  computerUseExtraSetupScript?: string
   computerUseExtraFlakeRef?: string
   githubAccountId?: string
   cloneRepositoryUrl?: string
@@ -154,6 +155,7 @@ export async function startWorkerContainer({
   env,
   enableSsh,
   enableComputerUse,
+  computerUseExtraSetupScript,
   computerUseExtraFlakeRef,
   githubAccountId,
   cloneRepositoryUrl,
@@ -182,6 +184,12 @@ export async function startWorkerContainer({
   const sshEnabled = enableSsh ?? env.WORKER_SSH_ENABLED === "1"
   const computerUseEnabled =
     enableComputerUse ?? env.WORKER_COMPUTER_USE_ENABLED === "1"
+  const resolvedComputerUseExtraSetupScript =
+    computerUseExtraSetupScript?.trim() ||
+    computerUseExtraFlakeRef?.trim() ||
+    env.WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT?.trim() ||
+    env.WORKER_COMPUTER_USE_EXTRA_FLAKE_REF?.trim() ||
+    ""
   const sshAuthorizedKeys =
     env.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
     secretEnv.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
@@ -206,9 +214,10 @@ export async function startWorkerContainer({
     ? {
         DISPLAY: ":1",
         WORKER_COMPUTER_USE_ENABLED: "1",
-        ...(computerUseExtraFlakeRef
+        ...(resolvedComputerUseExtraSetupScript
           ? {
-              WORKER_COMPUTER_USE_EXTRA_FLAKE_REF: computerUseExtraFlakeRef.trim(),
+              WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT:
+                resolvedComputerUseExtraSetupScript,
             }
           : {}),
         WORKER_VNC_PASSWORD:
