@@ -22,6 +22,9 @@ Use this skill for targeted UI bug fixes, not large redesigns.
    - iframe or websocket lifecycle mismatches
    - optimistic UI state diverging from backend state
 4. Patch the smallest surface that restores the expected behavior.
+5. In computer-use workers, verify regressions with MCP at the right layer:
+   - `desktop-browser-dom` for selector/state checks in Chromium
+   - `desktop-vision` for screenshot and layout confirmation when the browser chrome or desktop state matters
 
 ## Rules
 

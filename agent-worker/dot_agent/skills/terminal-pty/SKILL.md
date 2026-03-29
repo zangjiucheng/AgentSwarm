@@ -39,6 +39,7 @@ Trace the path in order:
 - If the path is wrong, inspect tmux session creation and startup scripts before the frontend.
 - If behavior differs after reconnect, compare initial session creation with attach flow.
 - Favor the smallest fix in the layer that owns the default.
+- If the task is really desktop/browser interaction rather than terminal behavior, switch to the computer-use MCP tools instead of debugging PTY layers.
 
 ## Verification
 

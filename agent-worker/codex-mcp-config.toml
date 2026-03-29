@@ -1,0 +1,19 @@
+[mcp_servers.desktop-vision]
+command = "node"
+args = ["/home/kasm-user/.codex/mcp/desktop-vision.mjs"]
+
+[mcp_servers.desktop-input]
+command = "node"
+args = ["/home/kasm-user/.codex/mcp/desktop-input.mjs"]
+
+[mcp_servers.desktop-browser-ui]
+command = "node"
+args = ["/home/kasm-user/.codex/mcp/desktop-browser-ui.mjs"]
+
+[mcp_servers.desktop-browser-dom]
+command = "node"
+args = ["/home/kasm-user/.codex/mcp/desktop-browser-dom.mjs"]
+
+[mcp_servers.desktop-files]
+command = "node"
+args = ["/home/kasm-user/.codex/mcp/desktop-files.mjs"]

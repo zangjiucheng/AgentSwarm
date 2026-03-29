@@ -27,6 +27,7 @@ Use this skill when the requested change belongs to the worker image or startup 
    - on first interactive shell
 3. Prefer one canonical implementation path. Avoid duplicating the same rule in multiple scripts unless it is required.
 4. If the change affects new workers only, say so clearly.
+5. For computer-use workers, treat worker-local MCP servers and their Codex config as part of the runtime contract, not ad hoc user setup.
 
 ## Validation Targets
 
@@ -36,3 +37,4 @@ Use this skill when the requested change belongs to the worker image or startup 
 - code-server availability
 - shell and tmux defaults
 - helper script presence and permissions
+- MCP config presence and correct computer-use gating

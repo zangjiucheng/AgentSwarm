@@ -70,6 +70,7 @@ RUN apt-get update \
       x11-utils \
       x11vnc \
       xauth \
+      xclip \
       xdotool \
       xterm \
       xvfb \
@@ -123,7 +124,9 @@ COPY --from=monitor-builder /app/apps/monitor/dist/native /usr/local/lib/bun-pty
 COPY --from=codex-installer /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 COPY --chown=1000:1000 agent-worker/dot_codex /home/kasm-user/.codex
+COPY --chown=1000:1000 agent-worker/mcp /home/kasm-user/.codex/mcp
 COPY --chown=1000:1000 agent-worker/dot_agent/skills /home/kasm-user/.codex/skills
+COPY agent-worker/codex-mcp-config.toml /usr/local/share/agentswarm/codex-mcp-config.toml
 COPY --chown=1000:1000 agent-worker/code-server-settings.json /home/kasm-user/.local/share/code-server/User/settings.json
 COPY --chown=1000:1000 agent-worker/tmux.conf /home/kasm-user/.tmux.conf
 COPY --chown=1000:1000 agent-worker/bashrc /home/kasm-user/.bashrc
