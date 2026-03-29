@@ -19,16 +19,8 @@ RUN mkdir -p /app/apps/monitor/dist/native \
 FROM node:22-bookworm-slim AS codex-installer
 
 ARG CODEX_VERSION
-ARG TARGETARCH
 
-RUN case "$TARGETARCH" in \
-      amd64) CODEX_PLATFORM_PACKAGE="@openai/codex-linux-x64@${CODEX_VERSION}" ;; \
-      arm64) CODEX_PLATFORM_PACKAGE="@openai/codex-linux-arm64@${CODEX_VERSION}" ;; \
-      *) echo "Unsupported TARGETARCH for Codex: $TARGETARCH" >&2; exit 1 ;; \
-    esac \
-    && npm install -g --unsafe-perm --include=optional \
-      "@openai/codex@${CODEX_VERSION}" \
-      "$CODEX_PLATFORM_PACKAGE"
+RUN npm install -g --unsafe-perm --include=optional "@openai/codex@${CODEX_VERSION}"
 
 FROM node:22-bookworm-slim
 
