@@ -1,4 +1,3 @@
-import { PassThrough } from "node:stream"
 import { docker } from "./worker-container"
 
 const COMPUTER_USE_STATE_DIR = "/home/kasm-user/.agentswarm/computer-use"
@@ -29,48 +28,60 @@ async function collectStream(stream: NodeJS.ReadableStream) {
   return Buffer.concat(chunks).toString("utf8")
 }
 
-async function execCapture(
-  containerId: string,
-  cmd: string[],
-) {
-  const exec = await docker.getContainer(containerId).exec({
-    AttachStderr: true,
-    AttachStdout: true,
-    Cmd: cmd,
-    Tty: false,
-  })
-
-  const stream = await exec.start({ hijack: false, stdin: false })
-  const stdout = new PassThrough()
-  const stderr = new PassThrough()
-
-  docker.modem.demuxStream(stream, stdout, stderr)
-
-  const [stdoutText, stderrText] = await Promise.all([
-    collectStream(stdout),
-    collectStream(stderr),
-  ])
-  const result = await exec.inspect()
-
-  return {
-    exitCode: result.ExitCode ?? 1,
-    stderr: stderrText.trim(),
-    stdout: stdoutText,
+function parseTarEntryContent(archiveBuffer: Buffer) {
+  if (archiveBuffer.length < 512) {
+    return null
   }
+
+  const header = archiveBuffer.subarray(0, 512)
+  const name = header
+    .subarray(0, 100)
+    .toString("utf8")
+    .replace(/\0.*$/, "")
+
+  if (!name) {
+    return null
+  }
+
+  const sizeRaw = header
+    .subarray(124, 136)
+    .toString("utf8")
+    .replace(/\0.*$/, "")
+    .trim()
+  const size = Number.parseInt(sizeRaw || "0", 8)
+
+  if (!Number.isFinite(size) || size < 0) {
+    return null
+  }
+
+  return archiveBuffer.subarray(512, 512 + size).toString("utf8")
 }
 
-function parseSection(content: string, marker: string) {
-  const start = content.indexOf(marker)
+async function readArchiveFile(
+  containerId: string,
+  path: string,
+) {
+  try {
+    const archiveStream = await docker.getContainer(containerId).getArchive({
+      path,
+    })
+    const archiveBuffer = Buffer.from(await collectStream(archiveStream))
+    return parseTarEntryContent(archiveBuffer)
+  } catch (error) {
+    const statusCode =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number"
+        ? error.statusCode
+        : undefined
 
-  if (start < 0) {
-    return ""
+    if (statusCode === 404) {
+      return null
+    }
+
+    throw error
   }
-
-  const remainder = content.slice(start + marker.length)
-  const nextMarker = remainder.indexOf("\n__")
-  const section = nextMarker >= 0 ? remainder.slice(0, nextMarker) : remainder
-
-  return section.trim()
 }
 
 export async function readComputerUseState(input: {
@@ -95,18 +106,11 @@ export async function readComputerUseState(input: {
   }
 
   try {
-    const output = await Promise.race([
-      execCapture(input.containerId, [
-        "sh",
-        "-lc",
-        `
-          printf '__STATUS__\\n'
-          cat "${COMPUTER_USE_STATUS_FILE}" 2>/dev/null || true
-          printf '\\n__ERROR__\\n'
-          cat "${COMPUTER_USE_ERROR_FILE}" 2>/dev/null || true
-          printf '\\n__LOG__\\n'
-          tail -n 80 "${COMPUTER_USE_LOG_FILE}" 2>/dev/null || true
-        `,
+    const [rawStatus, rawError, rawLog] = await Promise.race([
+      Promise.all([
+        readArchiveFile(input.containerId, COMPUTER_USE_STATUS_FILE),
+        readArchiveFile(input.containerId, COMPUTER_USE_ERROR_FILE),
+        readArchiveFile(input.containerId, COMPUTER_USE_LOG_FILE),
       ]),
       new Promise<never>((_, reject) => {
         setTimeout(() => {
@@ -115,16 +119,15 @@ export async function readComputerUseState(input: {
       }),
     ])
 
-    const rawStatus = parseSection(output.stdout, "__STATUS__")
     const parsedStatus =
-      rawStatus === "ready" ||
-      rawStatus === "error" ||
-      rawStatus === "preparing" ||
-      rawStatus === "disabled"
-        ? rawStatus
+      rawStatus?.trim() === "ready" ||
+      rawStatus?.trim() === "error" ||
+      rawStatus?.trim() === "preparing" ||
+      rawStatus?.trim() === "disabled"
+        ? rawStatus.trim()
         : "preparing"
-    const error = parseSection(output.stdout, "__ERROR__") || null
-    const log = parseSection(output.stdout, "__LOG__") || null
+    const error = rawError?.trim() || null
+    const log = rawLog?.trim() || null
 
     return {
       error,
