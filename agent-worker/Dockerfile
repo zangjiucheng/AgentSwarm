@@ -1,4 +1,5 @@
 ARG CODEX_VERSION=0.115.0
+ARG CODE_SERVER_VERSION=4.112.0
 
 FROM oven/bun:1 AS monitor-builder
 
@@ -24,6 +25,8 @@ RUN npm install -g --unsafe-perm "@openai/codex@${CODEX_VERSION}"
 FROM node:22-bookworm-slim
 
 ARG CODEX_VERSION
+ARG CODE_SERVER_VERSION
+ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/home/kasm-user
@@ -71,7 +74,17 @@ RUN apt-get update \
       openbox \
       novnc \
       zsh \
-    && HOME=/root NPM_CONFIG_PREFIX=/usr/local npm install -g --unsafe-perm code-server \
+    && case "$TARGETARCH" in \
+         amd64) CODE_SERVER_ARCH=amd64 ;; \
+         arm64) CODE_SERVER_ARCH=arm64 ;; \
+         *) echo "Unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server-${CODE_SERVER_VERSION}-linux-${CODE_SERVER_ARCH}.tar.gz" \
+      -o /tmp/code-server.tar.gz \
+    && tar -xzf /tmp/code-server.tar.gz -C /opt \
+    && mv "/opt/code-server-${CODE_SERVER_VERSION}-linux-${CODE_SERVER_ARCH}" /opt/code-server \
+    && ln -sf /opt/code-server/bin/code-server /usr/local/bin/code-server \
+    && rm -f /tmp/code-server.tar.gz \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000 kasm-user \
