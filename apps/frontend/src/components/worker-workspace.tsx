@@ -25,7 +25,6 @@ import type { GlobalSettings, WorkerConnectionInfo, WorkerInfo } from "../lib/ap
 import { getWorkerComputerUseUrl, getWorkerIframeUrl } from "../lib/worker-urls"
 import { trpc } from "../trpc"
 import { WorkerGithubModal } from "./worker-github-modal"
-import { WorkerTerminalPanel } from "./worker-terminal-panel"
 
 type WorkerWorkspaceState = "active" | "cached" | "unloaded"
 
@@ -675,12 +674,6 @@ export function WorkerWorkspace({
               </div>
             </div>
           )}
-
-          <WorkerTerminalPanel
-            isReady={isReady}
-            isStopped={isStopped}
-            monitorPort={worker.monitorPort}
-          />
         </div>
       </section>
     </>
