@@ -19,6 +19,7 @@ STATUS_FILE="$COMPUTER_USE_STATE_DIR/status"
 WORKER_USER="${WORKER_USER:-kasm-user}"
 WORKER_UID="${WORKER_UID:-1000}"
 WORKER_GID="${WORKER_GID:-1000}"
+WORKER_RUN_DESKTOP_AS_ROOT="${WORKER_RUN_DESKTOP_AS_ROOT:-1}"
 SETPRIV_BIN="${SETPRIV_BIN:-$(command -v setpriv || true)}"
 VNC_PORT="${WORKER_VNC_PORT:-6901}"
 VNC_PASSWORD="${WORKER_VNC_PASSWORD:-computer-use}"
@@ -61,6 +62,18 @@ run_as_worker_background() {
   local command_text="$1"
   local log_file="$2"
 
+  if [ "$WORKER_RUN_DESKTOP_AS_ROOT" = "1" ]; then
+    env \
+      HOME="$WORKER_HOME_DIR" \
+      USER="root" \
+      WORKSPACE_DIR="$WORKSPACE_DIR" \
+      DISPLAY="$DISPLAY_VALUE" \
+      PATH="$PATH" \
+      bash -lc "$command_text" \
+      >"$log_file" 2>&1 &
+    return 0
+  fi
+
   if [ "$(id -u)" -eq "$WORKER_UID" ]; then
     env \
       HOME="$WORKER_HOME_DIR" \
@@ -93,6 +106,17 @@ run_as_worker_background() {
 
 run_as_worker() {
   local command_text="$1"
+
+  if [ "$WORKER_RUN_DESKTOP_AS_ROOT" = "1" ]; then
+    env \
+      HOME="$WORKER_HOME_DIR" \
+      USER="root" \
+      WORKSPACE_DIR="$WORKSPACE_DIR" \
+      DISPLAY="$DISPLAY_VALUE" \
+      PATH="$PATH" \
+      bash -lc "$command_text"
+    return 0
+  fi
 
   if [ "$(id -u)" -eq "$WORKER_UID" ]; then
     env \

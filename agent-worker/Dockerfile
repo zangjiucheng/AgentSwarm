@@ -27,7 +27,7 @@ ARG CODEX_VERSION
 
 ENV HOME=/home/kasm-user
 ENV WORKER_PROFILE=/nix/var/nix/profiles/agentswarm-worker
-ENV SHELL=/nix/var/nix/profiles/agentswarm-worker/bin/zsh
+ENV SHELL=/nix/var/nix/profiles/agentswarm-worker/bin/bash
 ENV NPM_CONFIG_PREFIX=/home/kasm-user/.local
 ENV PATH="/home/kasm-user/.local/bin:/nix/var/nix/profiles/agentswarm-worker/bin:/nix/var/nix/profiles/agentswarm-worker/sbin:$PATH"
 ENV CODEX_VERSION=$CODEX_VERSION
@@ -47,8 +47,8 @@ RUN NIX_CONFIG='filter-syscalls = false' \
     nix profile add --profile "$WORKER_PROFILE" --accept-flake-config /tmp/agent-worker
 
 RUN printf '%s\n' \
-      'root:x:0:0:System administrator:/root:/nix/var/nix/profiles/agentswarm-worker/bin/sh' \
-      'kasm-user:x:1000:1000:AgentSwarm worker:/home/kasm-user:/nix/var/nix/profiles/agentswarm-worker/bin/zsh' \
+      'root:x:0:0:System administrator:/root:/nix/var/nix/profiles/agentswarm-worker/bin/bash' \
+      'kasm-user:x:1000:1000:AgentSwarm worker:/home/kasm-user:/nix/var/nix/profiles/agentswarm-worker/bin/bash' \
       > /etc/passwd \
     && printf '%s\n' \
       'root:x:0:' \

@@ -146,6 +146,7 @@ setup_vscode_remote_ssh_compat() {
   local fallback_path=""
   local library_path=""
   local managed_env_file="$HOME_DIR/.agentswarm-shell-env"
+  local bash_profile_file="$HOME_DIR/.bash_profile"
   local zshenv_file="$HOME_DIR/.zshenv"
   local vscode_env_dir="$HOME_DIR/.vscode-server"
   local vscode_env_file="$vscode_env_dir/server-env-setup"
@@ -357,6 +358,16 @@ setup_vscode_remote_ssh_compat() {
   fi
   chmod 644 "$zshenv_file"
   chown 1000:1000 "$zshenv_file"
+
+  touch "$bash_profile_file"
+  if ! grep -Fqx "$source_line" "$bash_profile_file"; then
+    printf '\n%s\n' "$source_line" >> "$bash_profile_file"
+  fi
+  if ! grep -Fqx '[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"' "$bash_profile_file"; then
+    printf '%s\n' '[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"' >> "$bash_profile_file"
+  fi
+  chmod 644 "$bash_profile_file"
+  chown 1000:1000 "$bash_profile_file"
 
   {
     printf '#!/usr/bin/env bash\n'
