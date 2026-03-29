@@ -48,7 +48,6 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "HOME",
     "HOSTNAME",
     "MONITOR_PORT",
-    "NIX_REMOTE",
     "NPM_CONFIG_PREFIX",
     "ORCHESTRATOR_ADDRESS",
     "ORCHESTRATOR_PORT",
@@ -66,7 +65,6 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "WORKER_SSH_PRIVATE_KEY",
     "WORKER_COMPUTER_USE_ENABLED",
     "WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT",
-    "WORKER_COMPUTER_USE_EXTRA_FLAKE_REF",
     "WORKER_VNC_PASSWORD",
     "WORKER_VNC_PORT",
     "WORKER_VNC_RESOLUTION",
@@ -189,8 +187,7 @@ export async function replaceManagedWorkerContainer(
   const currentSshEnabled = originalEnv.WORKER_SSH_ENABLED === "1"
   const currentComputerUseEnabled = originalEnv.WORKER_COMPUTER_USE_ENABLED === "1"
   const currentComputerUseExtraSetupScript =
-    originalEnv.WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT ??
-    originalEnv.WORKER_COMPUTER_USE_EXTRA_FLAKE_REF
+    originalEnv.WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT
 
   let replacement:
     | Awaited<ReturnType<typeof startWorkerContainer>>

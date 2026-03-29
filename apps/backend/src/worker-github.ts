@@ -6,7 +6,7 @@ import {
 import { findManagedContainerById, listManagedContainerIds } from "./worker-container"
 
 const WORKER_HOME = "/home/kasm-user"
-const WORKER_SHELL = "/nix/var/nix/profiles/agentswarm-worker/bin/zsh"
+const WORKER_SHELL = "/bin/bash"
 
 async function execInContainer(
   container: Docker.Container,

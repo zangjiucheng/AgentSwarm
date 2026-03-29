@@ -11,7 +11,7 @@ Use this skill to build a fast, accurate mental model of a codebase before editi
 
 1. Start with the smallest high-signal files:
    - `README.md`
-   - root manifests such as `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `flake.nix`
+   - root manifests such as `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`
    - container and orchestration files such as `Dockerfile`, `docker-compose.yml`, `compose.yaml`
 2. Identify the top-level apps, packages, or services before reading implementation files.
 3. Use fast search first:

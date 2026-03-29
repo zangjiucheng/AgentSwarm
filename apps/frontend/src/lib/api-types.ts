@@ -75,7 +75,6 @@ export type WorkersResponse = {
 export type StartWorkerInput = {
   cloneRepositoryUrl?: string
   computerUseExtraSetupScript?: string
-  computerUseExtraFlakeRef?: string
   env: Record<string, string>
   enableComputerUse?: boolean
   enableSsh?: boolean

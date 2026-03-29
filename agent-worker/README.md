@@ -16,7 +16,7 @@ Included by default:
 - VS Code Vim extension (`vscodevim.vim`)
 - OpenAI Codex CLI
 - `configure-github.sh` helper at `~/configure-github.sh` and `configure-github`
-- Bundled Codex skills: `nix-flake`, `repo-survey`, `terminal-pty`, `worker-runtime`, `github-auth`, `frontend-regression`
+- Bundled Codex skills: `repo-survey`, `terminal-pty`, `worker-runtime`, `github-auth`, `frontend-regression`
 - Docker in Docker
 - Git, GitHub CLI, tmux, ripgrep, Python 3
 - Optional XFCE/noVNC desktop stack for computer-use workers

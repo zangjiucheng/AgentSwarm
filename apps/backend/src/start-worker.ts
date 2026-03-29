@@ -35,7 +35,6 @@ type StartWorkerParams = {
   enableSsh?: boolean
   enableComputerUse?: boolean
   computerUseExtraSetupScript?: string
-  computerUseExtraFlakeRef?: string
   githubAccountId?: string
   cloneRepositoryUrl?: string
   labels?: Record<string, string>
@@ -156,7 +155,6 @@ export async function startWorkerContainer({
   enableSsh,
   enableComputerUse,
   computerUseExtraSetupScript,
-  computerUseExtraFlakeRef,
   githubAccountId,
   cloneRepositoryUrl,
   labels,
@@ -186,9 +184,7 @@ export async function startWorkerContainer({
     enableComputerUse ?? env.WORKER_COMPUTER_USE_ENABLED === "1"
   const resolvedComputerUseExtraSetupScript =
     computerUseExtraSetupScript?.trim() ||
-    computerUseExtraFlakeRef?.trim() ||
     env.WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT?.trim() ||
-    env.WORKER_COMPUTER_USE_EXTRA_FLAKE_REF?.trim() ||
     ""
   const sshAuthorizedKeys =
     env.WORKER_SSH_AUTHORIZED_KEYS?.trim() ||
