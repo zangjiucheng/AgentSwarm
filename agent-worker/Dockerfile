@@ -71,7 +71,7 @@ RUN apt-get update \
       openbox \
       novnc \
       zsh \
-    && npm install -g --unsafe-perm code-server \
+    && HOME=/root NPM_CONFIG_PREFIX=/usr/local npm install -g --unsafe-perm code-server \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000 kasm-user \
