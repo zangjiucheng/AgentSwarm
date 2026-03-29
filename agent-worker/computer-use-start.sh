@@ -27,6 +27,7 @@ X11VNC_PORT="${WORKER_X11VNC_PORT:-5900}"
 NIX_DAEMON_SOCKET="${NIX_DAEMON_SOCKET:-/nix/var/nix/daemon-socket/socket}"
 NIX_BUILD_RETRY_COUNT="${NIX_BUILD_RETRY_COUNT:-5}"
 NIX_BUILD_RETRY_DELAY_S="${NIX_BUILD_RETRY_DELAY_S:-3}"
+NIX_BUILD_INITIAL_DELAY_S="${NIX_BUILD_INITIAL_DELAY_S:-10}"
 
 mkdir -p "$COMPUTER_USE_STATE_DIR" "$(dirname "$COMPUTER_USE_PROFILE")"
 : > "$LOG_FILE"
@@ -180,6 +181,11 @@ wait_for_nix_daemon() {
   sleep 3
 }
 
+warm_nix_daemon() {
+  HOME=/root USER=root NIX_REMOTE=daemon nix-store --version >/dev/null 2>&1 || true
+  return 0
+}
+
 build_flake_with_retry() {
   local out_link="$1"
   local flake_ref="$2"
@@ -196,9 +202,10 @@ build_flake_with_retry() {
       --out-link "$out_link" \
       "$flake_ref"; then
       return 0
+    else
+      exit_code=$?
     fi
 
-    exit_code=$?
     echo "nix build for ${label} failed with exit code ${exit_code}"
 
     if [ "$attempt" -lt "$NIX_BUILD_RETRY_COUNT" ]; then
@@ -301,6 +308,8 @@ prepare_flake_environment() {
 
   export NIX_CONFIG="$(printf '%s\n%s\n' "${NIX_CONFIG:-}" 'filter-syscalls = false')"
   wait_for_nix_daemon || fail "Nix daemon is not ready for computer use mode"
+  sleep "$NIX_BUILD_INITIAL_DELAY_S"
+  warm_nix_daemon
 
   build_flake_with_retry \
     "$COMPUTER_USE_DEFAULT_LINK" \
