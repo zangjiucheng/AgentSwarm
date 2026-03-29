@@ -19,8 +19,16 @@ RUN mkdir -p /app/apps/monitor/dist/native \
 FROM node:22-bookworm-slim AS codex-installer
 
 ARG CODEX_VERSION
+ARG TARGETARCH
 
-RUN npm install -g --unsafe-perm --include=optional "@openai/codex@${CODEX_VERSION}"
+RUN case "$TARGETARCH" in \
+      amd64) CODEX_PLATFORM_ALIAS="@openai/codex-linux-x64@npm:@openai/codex@${CODEX_VERSION}-linux-x64" ;; \
+      arm64) CODEX_PLATFORM_ALIAS="@openai/codex-linux-arm64@npm:@openai/codex@${CODEX_VERSION}-linux-arm64" ;; \
+      *) echo "Unsupported TARGETARCH for Codex: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && npm install -g --unsafe-perm --include=optional \
+      "@openai/codex@${CODEX_VERSION}" \
+      "$CODEX_PLATFORM_ALIAS"
 
 FROM node:22-bookworm-slim
 
@@ -113,7 +121,6 @@ COPY --from=monitor-builder /usr/local/bin/bunx /usr/local/bin/bunx
 COPY --from=monitor-builder /app/apps/monitor/dist/index.js /usr/local/bin/monitor.js
 COPY --from=monitor-builder /app/apps/monitor/dist/native /usr/local/lib/bun-pty
 COPY --from=codex-installer /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=codex-installer /usr/local/bin/codex /usr/local/bin/codex
 
 COPY --chown=1000:1000 agent-worker/dot_codex /home/kasm-user/.codex
 COPY --chown=1000:1000 agent-worker/dot_agent/skills /home/kasm-user/.codex/skills
@@ -133,6 +140,7 @@ RUN chmod +x \
       /usr/local/bin/agent-worker-entrypoint \
       /usr/local/bin/computer-use-start \
     && ln -sf /home/kasm-user/configure-github.sh /usr/local/bin/configure-github \
+    && ln -sf /usr/local/lib/node_modules/@openai/codex/bin/codex.js /usr/local/bin/codex \
     && mkdir -p \
       /home/kasm-user/.cache \
       /home/kasm-user/.local/bin \
