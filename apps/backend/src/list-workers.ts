@@ -11,8 +11,10 @@ import {
   WORKER_PRESET_LABEL,
   WORKER_SSH_PORT,
   WORKER_TITLE_LABEL,
+  WORKER_VNC_PORT,
 } from "./worker-container"
-import { getEffectiveGithubAccountForWorker } from "./secrets"
+import { getEffectiveGithubAccountForWorker, getStoredWorkerTitle } from "./secrets"
+import { readComputerUseState, type ComputerUseStatus } from "./computer-use"
 
 const WORKERS_CACHE_TTL_MS = 900
 
@@ -25,6 +27,9 @@ export type WorkerInfo = {
   monitorPort: number
   sshEnabled: boolean
   sshPort: number
+  computerUseEnabled: boolean
+  computerUseStatus: ComputerUseStatus
+  vncPort: number
   createdWithVersion: string
   currentAgentSwarmVersion: string
   workerImageTag: string
@@ -133,9 +138,17 @@ async function loadWorkers(): Promise<WorkersResult> {
       const port = readPublishedPort(inspection)
       const monitorPort = readPublishedPort(inspection, WORKER_MONITOR_PORT)
       const sshPort = readPublishedPort(inspection, WORKER_SSH_PORT)
+      const vncPort = readPublishedPort(inspection, WORKER_VNC_PORT)
       const sshEnabled = env.WORKER_SSH_ENABLED === "1"
+      const computerUseEnabled = env.WORKER_COMPUTER_USE_ENABLED === "1"
+      const computerUseState = await readComputerUseState({
+        computerUseEnabled,
+        containerId: container.Id,
+        running: inspection.State.Running,
+      })
       const monitorStatus = getContainerMonitorStatus(inspection)
       const githubAccount = getEffectiveGithubAccountForWorker(container.Id)
+      const storedTitle = getStoredWorkerTitle(container.Id)
 
       const parentId =
         inspection.Config.Labels?.[WORKER_PARENT_LABEL] ??
@@ -147,9 +160,10 @@ async function loadWorkers(): Promise<WorkersResult> {
         info: {
           id: container.Id,
           title:
-            inspection.Config.Labels?.[WORKER_TITLE_LABEL] ??
-            container.Labels?.[WORKER_TITLE_LABEL] ??
-            inspection.Name.replace(/^\//, ""),
+            storedTitle ||
+            (inspection.Config.Labels?.[WORKER_TITLE_LABEL] ??
+              container.Labels?.[WORKER_TITLE_LABEL] ??
+              inspection.Name.replace(/^\//, "")),
           preset:
             inspection.Config.Labels?.[WORKER_PRESET_LABEL] ??
             container.Labels?.[WORKER_PRESET_LABEL] ??
@@ -159,6 +173,9 @@ async function loadWorkers(): Promise<WorkersResult> {
           monitorPort: monitorPort ?? 0,
           sshEnabled,
           sshPort: sshPort ?? 0,
+          computerUseEnabled,
+          computerUseStatus: computerUseState.status,
+          vncPort: vncPort ?? 0,
           createdWithVersion:
             inspection.Config.Labels?.[WORKER_CREATED_WITH_VERSION_LABEL] ??
             container.Labels?.[WORKER_CREATED_WITH_VERSION_LABEL] ??

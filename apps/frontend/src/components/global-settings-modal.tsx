@@ -178,12 +178,12 @@ export function GlobalSettingsModal({
       placement="top-center"
       size="4xl"
     >
-      <ModalContent>
+      <ModalContent className="max-h-[85vh] overflow-hidden">
         {(close) => (
           <>
             <ModalHeader>Settings</ModalHeader>
-            <ModalBody className="gap-0 px-0 py-0 md:flex-row">
-              <aside className="border-default-200 bg-default-50/40 border-b px-3 py-3 md:w-64 md:border-b-0 md:border-r">
+            <ModalBody className="min-h-0 gap-0 overflow-hidden px-0 py-0 md:flex-row">
+              <aside className="border-default-200 bg-default-50/40 shrink-0 border-b px-3 py-3 md:w-64 md:border-b-0 md:border-r">
                 <div className="space-y-2">
                   <button
                     className={`w-full rounded-xl border px-4 py-3 text-left transition ${
@@ -235,7 +235,7 @@ export function GlobalSettingsModal({
                 </div>
               </aside>
 
-              <div className="min-h-[30rem] flex-1 px-6 py-5">
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5">
                 {activeSection === "github" ? (
                   <div className="space-y-5">
                     <div className="rounded-xl border border-default-200 px-4 py-4">
@@ -481,8 +481,8 @@ export function GlobalSettingsModal({
                 ) : null}
               </div>
             </ModalBody>
-            <ModalFooter className="justify-between">
-              <p className="text-default-400 text-xs">
+            <ModalFooter className="flex-wrap items-start justify-between gap-3">
+              <p className="min-w-0 flex-1 text-default-400 text-xs">
                 {activeSection === "github"
                   ? "GitHub tokens stay in the backend secret store and can be assigned per worker."
                   : "Changes here apply to newly running workers across the dashboard."}

@@ -1,6 +1,7 @@
 import { TRPCError, initTRPC } from "@trpc/server"
 import { z } from "zod"
 import {
+  renameManagedWorkerContainer,
   replaceManagedWorkerContainer,
   startManagedWorkerContainer,
   stopManagedWorkerContainer,
@@ -27,11 +28,13 @@ import {
   resolveWorkerByIp,
   WORKER_PARENT_LABEL,
   WORKER_SSH_PORT,
+  WORKER_VNC_PORT,
 } from "./worker-container"
 import {
   applyGithubAccountToWorker,
   applyGithubAccountsToRunningWorkers,
 } from "./worker-github"
+import { readComputerUseState } from "./computer-use"
 
 export type TRPCContext = {
   clientIp: string | undefined
@@ -57,6 +60,9 @@ const workerSchema = z.object({
   monitorPort: z.number(),
   sshEnabled: z.boolean(),
   sshPort: z.number(),
+  computerUseEnabled: z.boolean(),
+  computerUseStatus: z.enum(["disabled", "preparing", "ready", "error"]),
+  vncPort: z.number(),
   createdWithVersion: z.string(),
   currentAgentSwarmVersion: z.string(),
   workerImageTag: z.string(),
@@ -232,6 +238,29 @@ export const appRouter = router({
 
       return undefined
     }),
+  renameWorker: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        title: z.string().trim().min(1),
+      }),
+    )
+    .output(z.void())
+    .mutation(async ({ input }) => {
+      try {
+        await renameManagedWorkerContainer(input.id, input.title)
+        return undefined
+      } catch (error) {
+        console.error("[renameWorker] failed to rename worker", error)
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error ? error.message : "Failed to rename worker",
+          cause: error,
+        })
+      }
+    }),
   workers: publicProcedure.output(workersSchema).query(async () => {
     return listWorkers()
   }),
@@ -249,6 +278,11 @@ export const appRouter = router({
         sshPassword: z.string().nullable(),
         sshPort: z.number().nullable(),
         sshUser: z.string().nullable(),
+        computerUseError: z.string().nullable(),
+        computerUseLog: z.string().nullable(),
+        computerUseStatus: z.enum(["disabled", "preparing", "ready", "error"]),
+        vncPassword: z.string().nullable(),
+        vncPort: z.number().nullable(),
         workspaceDir: z.string().nullable(),
       }),
     )
@@ -273,8 +307,16 @@ export const appRouter = router({
         ""
       const sshPrivateKey = env.WORKER_SSH_PRIVATE_KEY?.trim() || null
       const sshPort = readPublishedPort(inspection, WORKER_SSH_PORT) ?? null
+      const vncPort = readPublishedPort(inspection, WORKER_VNC_PORT) ?? null
       const sshEnabled = env.WORKER_SSH_ENABLED === "1"
+      const computerUseEnabled = env.WORKER_COMPUTER_USE_ENABLED === "1"
+      const computerUseState = await readComputerUseState({
+        computerUseEnabled,
+        containerId: input.id,
+        running: inspection.State.Running,
+      })
       const sshPassword = env.WORKER_SSH_PASSWORD?.trim() || null
+      const vncPassword = env.WORKER_VNC_PASSWORD?.trim() || null
       const workspaceDir = env.WORKSPACE_DIR?.trim() || "/home/kasm-user/workers"
       const sshAuthMode =
         sshPassword !== null
@@ -288,11 +330,16 @@ export const appRouter = router({
 
       return {
         available,
+        computerUseError: computerUseState.error,
+        computerUseLog: computerUseState.log,
+        computerUseStatus: computerUseState.status,
         sshAuthMode,
         sshPrivateKey,
         sshPassword,
         sshPort,
         sshUser: available ? "kasm-user" : null,
+        vncPassword: computerUseState.status === "ready" ? vncPassword : null,
+        vncPort: computerUseState.status === "ready" ? vncPort : null,
         workspaceDir: available ? workspaceDir : null,
       }
     }),
@@ -455,6 +502,9 @@ export const appRouter = router({
         preset: z.string(),
         env: z.record(z.string(), z.string()),
         enableSsh: z.boolean().optional(),
+        enableComputerUse: z.boolean().optional(),
+        computerUseExtraSetupScript: z.string().trim().min(1).optional(),
+        computerUseExtraFlakeRef: z.string().trim().min(1).optional(),
         githubAccountId: z.string().trim().optional(),
         cloneRepositoryUrl: z.string().trim().min(1).optional(),
       }),

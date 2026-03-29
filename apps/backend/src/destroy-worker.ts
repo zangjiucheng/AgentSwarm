@@ -1,6 +1,8 @@
 import { docker, findManagedContainerById, WORKER_WORKSPACE_VOLUME_LABEL } from "./worker-container"
 import { clearWorkersCache } from "./list-workers"
-import { clearWorkerGithubAccount } from "./secrets"
+import { clearStoredWorkerTitle, clearWorkerGithubAccount } from "./secrets"
+
+const WORKSPACE_ROOT = "/home/kasm-user/workers"
 
 export async function destroyWorkerContainer(
   id: string,
@@ -14,7 +16,13 @@ export async function destroyWorkerContainer(
 
   const inspection = await container.inspect()
   const workspaceVolumeName =
-    inspection.Config.Labels?.[WORKER_WORKSPACE_VOLUME_LABEL]
+    inspection.Config.Labels?.[WORKER_WORKSPACE_VOLUME_LABEL] ??
+    inspection.Mounts.find(
+      (mount) =>
+        mount.Type === "volume" &&
+        mount.Destination === WORKSPACE_ROOT &&
+        Boolean(mount.Name),
+    )?.Name
 
   await container.remove({ force: true })
 
@@ -27,5 +35,6 @@ export async function destroyWorkerContainer(
   }
 
   clearWorkerGithubAccount(id)
+  clearStoredWorkerTitle(id)
   clearWorkersCache()
 }

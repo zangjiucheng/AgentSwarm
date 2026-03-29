@@ -1,7 +1,7 @@
 # AgentSwarm
 
 [![Docker](https://github.com/zangjiucheng/AgentSwarm/actions/workflows/docker.yml/badge.svg)](https://github.com/zangjiucheng/AgentSwarm/actions/workflows/docker.yml)
-[![Nix Worker](https://img.shields.io/badge/Nix-worker-5277C3?logo=nixos&logoColor=white)](./agent-worker/flake.nix)
+[![Debian Worker](https://img.shields.io/badge/Debian-worker-A81D33?logo=debian&logoColor=white)](./agent-worker/Dockerfile)
 
 AgentSwarm runs a Docker-hosted dashboard that creates persistent coding workers. Each worker exposes a `code-server` IDE, a terminal monitor, and an SSH endpoint that can be used with VS Code Remote-SSH.
 
@@ -98,6 +98,7 @@ The runtime image already includes a default config, so mounting `apps/backend/c
 
 - Docker-hosted dashboard for creating and managing persistent workers
 - Browser-based `code-server` IDE for each worker
+- Optional desktop mode with browser VNC access for computer-use flows, while the main workspace stays on `code-server`
 - Worker SSH access for VS Code Remote-SSH
 - Persistent workspace volumes with pause/start and migrate support
 - Dashboard-managed GitHub accounts and worker auto-pause settings

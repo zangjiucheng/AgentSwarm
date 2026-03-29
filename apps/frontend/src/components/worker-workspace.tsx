@@ -1,5 +1,6 @@
 import {
   Button,
+  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -14,26 +15,28 @@ import {
   IconCopy,
   IconRefresh,
   IconExternalLink,
+  IconPencil,
   IconPlayerPause,
   IconPlayerPlay,
   IconTrash,
 } from "@tabler/icons-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { GlobalSettings, WorkerConnectionInfo, WorkerInfo } from "../lib/api-types"
-import { getWorkerIframeUrl } from "../lib/worker-urls"
+import { getWorkerComputerUseUrl, getWorkerIframeUrl } from "../lib/worker-urls"
 import { trpc } from "../trpc"
 import { WorkerGithubModal } from "./worker-github-modal"
-import { WorkerTerminalPanel } from "./worker-terminal-panel"
 
 type WorkerWorkspaceState = "active" | "cached" | "unloaded"
 
 type WorkerWorkspaceProps = {
   globalSettings: GlobalSettings
   isReplacing: boolean
+  isRenaming: boolean
   isUpdatingSsh: boolean
   isStarting: boolean
   isStopping: boolean
   onDestroyWorker: (id: string) => Promise<void>
+  onRenameWorker: (id: string, title: string) => Promise<void>
   onReplaceWorker: (id: string) => Promise<void>
   onSetWorkerSsh: (id: string, enabled: boolean) => Promise<void>
   onStartWorker: (id: string) => Promise<void>
@@ -158,10 +161,12 @@ async function copyTextToClipboard(value: string) {
 export function WorkerWorkspace({
   globalSettings,
   isReplacing,
+  isRenaming,
   isUpdatingSsh,
   isStarting,
   isStopping,
   onDestroyWorker,
+  onRenameWorker,
   onReplaceWorker,
   onSetWorkerSsh,
   onStartWorker,
@@ -172,11 +177,17 @@ export function WorkerWorkspace({
   const [destroyModalOpen, setDestroyModalOpen] = useState(false)
   const [githubModalOpen, setGithubModalOpen] = useState(false)
   const [isDestroying, setIsDestroying] = useState(false)
+  const [renameModalOpen, setRenameModalOpen] = useState(false)
+  const [renameTitle, setRenameTitle] = useState(worker.title)
   const [sshPanelOpen, setSshPanelOpen] = useState(false)
   const [copiedSshField, setCopiedSshField] = useState<
     "command" | "config" | "credential" | null
   >(null)
   const copyResetTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    setRenameTitle(worker.title)
+  }, [worker.title])
 
   useEffect(() => {
     return () => {
@@ -191,17 +202,29 @@ export function WorkerWorkspace({
       ? "pointer-events-auto opacity-100"
       : "pointer-events-none opacity-0"
   const hasWorkerPort = worker.port > 0
+  const hasComputerUsePort = worker.vncPort > 0
   const isReady = worker.status === "ready"
   const isStopped = worker.status === "stopped"
   const workerUrl = getWorkerIframeUrl(worker.port)
   const workerConnectionQuery = trpc.workerConnection.useQuery(
     { id: worker.id },
     {
-      enabled: state === "active" && sshPanelOpen && worker.sshEnabled,
+      enabled:
+        state === "active" &&
+        ((sshPanelOpen && worker.sshEnabled) || worker.computerUseEnabled),
       refetchInterval: 10_000,
       refetchOnWindowFocus: false,
     },
   )
+  const computerUseUrl = getWorkerComputerUseUrl(
+    worker.vncPort,
+    workerConnectionQuery.data?.vncPassword,
+  )
+  const computerUseStatus = workerConnectionQuery.data?.computerUseStatus ??
+    worker.computerUseStatus
+  const computerUseReady = computerUseStatus === "ready"
+  const computerUsePreparing = computerUseStatus === "preparing"
+  const computerUseError = computerUseStatus === "error"
 
   const sshDetails = useMemo(() => {
     const connection = workerConnectionQuery.data as WorkerConnectionInfo | undefined
@@ -247,6 +270,9 @@ export function WorkerWorkspace({
     }
   }, [worker.id, workerConnectionQuery.data])
 
+  const desktopUrl = computerUseUrl
+  const workspaceTitle = `${worker.title} code-server`
+
   const handleDestroy = async () => {
     setIsDestroying(true)
     try {
@@ -254,6 +280,24 @@ export function WorkerWorkspace({
     } finally {
       setIsDestroying(false)
       setDestroyModalOpen(false)
+    }
+  }
+
+  const handleRename = async () => {
+    const nextTitle = renameTitle.trim()
+
+    if (!nextTitle) {
+      window.alert("Worker title cannot be empty")
+      return
+    }
+
+    try {
+      await onRenameWorker(worker.id, nextTitle)
+      setRenameModalOpen(false)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to rename worker"
+      window.alert(message)
     }
   }
 
@@ -317,6 +361,42 @@ export function WorkerWorkspace({
         </ModalContent>
       </Modal>
 
+      <Modal
+        backdrop="blur"
+        isOpen={renameModalOpen}
+        onOpenChange={setRenameModalOpen}
+        placement="top-center"
+      >
+        <ModalContent>
+          {(close) => (
+            <>
+              <ModalHeader>Rename Worker</ModalHeader>
+              <ModalBody>
+                <Input
+                  autoFocus
+                  label="Worker title"
+                  onValueChange={setRenameTitle}
+                  placeholder="Enter a title"
+                  value={renameTitle}
+                />
+              </ModalBody>
+              <ModalFooter className="pt-3">
+                <Button onPress={close} variant="light">
+                  Cancel
+                </Button>
+                <Button
+                  isLoading={isRenaming}
+                  onPress={() => void handleRename()}
+                  variant="flat"
+                >
+                  Save
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
       <WorkerGithubModal
         isOpen={githubModalOpen}
         onOpenChange={setGithubModalOpen}
@@ -326,6 +406,15 @@ export function WorkerWorkspace({
 
       <section className={`absolute inset-0 flex flex-col ${hiddenClass}`}>
         <div className="flex items-center justify-end gap-2 border-b border-gray-700 bg-[#282828] px-4 py-3">
+          <Button
+            isLoading={isRenaming}
+            onPress={() => setRenameModalOpen(true)}
+            size="sm"
+            startContent={<IconPencil size={16} />}
+            variant="light"
+          >
+            Rename
+          </Button>
           <Button
             onPress={() => setGithubModalOpen(true)}
             size="sm"
@@ -401,6 +490,20 @@ export function WorkerWorkspace({
           >
             Open in tab
           </Button>
+          {worker.computerUseEnabled ? (
+            <Button
+              as="a"
+              href={desktopUrl}
+              isDisabled={!hasComputerUsePort || !isReady || !computerUseReady}
+              rel="noreferrer"
+              size="sm"
+              startContent={<IconExternalLink size={16} />}
+              target="_blank"
+              variant="flat"
+            >
+              Open desktop
+            </Button>
+          ) : null}
           <Button
             color="danger"
             isIconOnly
@@ -494,13 +597,47 @@ export function WorkerWorkspace({
             </div>
           ) : null}
 
+          {worker.computerUseEnabled ? (
+            <div className="border-b border-gray-800 bg-[#1d1d1d] px-4 py-2 text-xs text-gray-300">
+              <span className="font-medium text-gray-100">Computer use mode</span>
+              <span className="ml-2 uppercase text-gray-400">{computerUseStatus}</span>
+              {computerUseReady && workerConnectionQuery.data?.vncPassword ? (
+                <span>{` · VNC password: ${workerConnectionQuery.data.vncPassword}`}</span>
+              ) : null}
+              <span className="ml-2 text-gray-400">
+                Desktop opens in a separate tab so the main workspace stays on code-server.
+              </span>
+            </div>
+          ) : null}
+
+          {worker.computerUseEnabled && (computerUsePreparing || computerUseError) ? (
+            <div className="border-b border-gray-800 bg-[#191919] px-4 py-3">
+              <p className="text-sm font-medium text-gray-100">
+                {computerUsePreparing
+                  ? "Preparing computer-use environment"
+                  : "Computer-use environment failed"}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                {computerUsePreparing
+                  ? "Desktop packages and optional setup scripts are being provisioned. code-server stays available while this finishes."
+                  : workerConnectionQuery.data?.computerUseError ??
+                    "Open desktop will remain unavailable until provisioning succeeds."}
+              </p>
+              {workerConnectionQuery.data?.computerUseLog ? (
+                <pre className="mt-3 max-h-48 overflow-auto rounded-md border border-gray-800 bg-[#111111] px-3 py-3 whitespace-pre-wrap break-all font-mono text-[11px] text-gray-200">
+                  {workerConnectionQuery.data.computerUseLog}
+                </pre>
+              ) : null}
+            </div>
+          ) : null}
+
           {hasWorkerPort && isReady ? (
             <iframe
               allow="clipboard-read; clipboard-write; fullscreen; self"
               allowFullScreen
               className="min-h-0 flex-1 border-0 bg-[#282828]"
               src={workerUrl}
-              title={`${worker.title} code-server`}
+              title={workspaceTitle}
             />
           ) : isStopped ? (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-[#282828] px-6">
@@ -509,8 +646,9 @@ export function WorkerWorkspace({
                   Worker is stopped
                 </p>
                 <p className="text-default-500 mt-2 text-xs">
-                  Start this worker to relaunch its code-server session and reopen
-                  the persisted workspace.
+                  Start this worker to relaunch its
+                  {worker.computerUseEnabled ? " code-server and desktop session" : " code-server session"}
+                  {" "}and reopen the persisted workspace.
                 </p>
                 <Button
                   className="mt-4"
@@ -530,18 +668,12 @@ export function WorkerWorkspace({
                   Worker is not ready
                 </p>
                 <p className="text-default-500 mt-2 text-xs">
-                  The code-server endpoint is unavailable. Check the worker logs
-                  or Docker Desktop for the startup failure.
+                  The code-server endpoint is unavailable. Check the worker logs or
+                  Docker Desktop for the startup failure.
                 </p>
               </div>
             </div>
           )}
-
-          <WorkerTerminalPanel
-            isReady={isReady}
-            isStopped={isStopped}
-            monitorPort={worker.monitorPort}
-          />
         </div>
       </section>
     </>

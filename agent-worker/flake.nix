@@ -65,6 +65,34 @@
             zsh
           ];
         };
+        computerUseEnv = pkgs.buildEnv {
+          name = "agentswarm-worker-computer-use-env";
+          paths = with pkgs; [
+            chromium
+            dbus
+            jq
+            novnc
+            openbox
+            python3Packages.websockify
+            scrot
+            wmctrl
+            x11vnc
+            xdotool
+            xfce.thunar
+            xfce.xfce4-panel
+            xfce.xfce4-session
+            xfce.xfce4-terminal
+            xfce.xfdesktop
+            xfce.xfwm4
+            xorg.xauth
+            xorg.xhost
+            xorg.xorgserver
+            xorg.xrandr
+            xorg.xset
+            xorg.xsetroot
+            xterm
+          ];
+        };
         nodejs = pkgs.nodejs_22;
       });
     };

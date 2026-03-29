@@ -44,6 +44,7 @@ export function DashboardPage() {
     staleTime: Number.POSITIVE_INFINITY,
   })
   const destroyWorker = trpc.destroyWorker.useMutation()
+  const renameWorker = trpc.renameWorker.useMutation()
   const replaceWorker = trpc.replaceWorker.useMutation()
   const setWorkerSsh = trpc.setWorkerSsh.useMutation()
   const startExistingWorker = trpc.startExistingWorker.useMutation()
@@ -106,6 +107,11 @@ export function DashboardPage() {
 
   const handleStartWorker = async (id: string) => {
     await startExistingWorker.mutateAsync({ id })
+    await workersQuery.refetch()
+  }
+
+  const handleRenameWorker = async (id: string, title: string) => {
+    await renameWorker.mutateAsync({ id, title })
     await workersQuery.refetch()
   }
 
@@ -190,6 +196,9 @@ export function DashboardPage() {
                   isReplacing={
                     replaceWorker.isPending && replaceWorker.variables?.id === worker.id
                   }
+                  isRenaming={
+                    renameWorker.isPending && renameWorker.variables?.id === worker.id
+                  }
                   isUpdatingSsh={
                     setWorkerSsh.isPending && setWorkerSsh.variables?.id === worker.id
                   }
@@ -202,6 +211,7 @@ export function DashboardPage() {
                   }
                   key={worker.id}
                   onDestroyWorker={handleDestroyWorker}
+                  onRenameWorker={handleRenameWorker}
                   onReplaceWorker={handleReplaceWorker}
                   onSetWorkerSsh={handleSetWorkerSsh}
                   onStartWorker={handleStartWorker}

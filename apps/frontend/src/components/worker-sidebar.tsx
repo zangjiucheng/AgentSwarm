@@ -143,6 +143,13 @@ function WorkerItem({
         <p className="mt-1 text-xs text-gray-500">
           created {formatVersionLabel(worker.createdWithVersion)} / current {formatVersionLabel(worker.currentAgentSwarmVersion)}
         </p>
+        {worker.computerUseEnabled &&
+        (worker.computerUseStatus === "preparing" ||
+          worker.computerUseStatus === "error") ? (
+          <p className="mt-1 text-[11px] text-amber-300">
+            desktop {worker.computerUseStatus}
+          </p>
+        ) : null}
       </Button>
       <WorkerControls
         isDestroying={isDestroying}
@@ -203,6 +210,13 @@ function SubWorkerItem({
           {" -> "}
           {formatVersionLabel(worker.currentAgentSwarmVersion)}
         </p>
+        {worker.computerUseEnabled &&
+        (worker.computerUseStatus === "preparing" ||
+          worker.computerUseStatus === "error") ? (
+          <p className="mt-1 text-[11px] text-amber-300">
+            desktop {worker.computerUseStatus}
+          </p>
+        ) : null}
       </Button>
       <WorkerControls
         isDestroying={isDestroying}

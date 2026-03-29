@@ -11,6 +11,7 @@
 ### Worker Runtime
 
 - One `code-server` IDE per worker.
+- Optional desktop exposed over browser VNC for computer-use workflows, while the main workspace remains in `code-server`.
 - Persistent workspace storage mounted at `/home/kasm-user/workers`.
 - Optional repository clone on first boot.
 - Optional GitHub account injection for HTTPS clone, `gh`, and git operations.
@@ -28,6 +29,8 @@
 ### In Browser
 
 The dashboard embeds each worker's `code-server` instance directly.
+
+Computer-use workers keep `code-server` in the main pane and expose desktop access through `Open desktop` once provisioning finishes.
 
 ### VS Code Remote-SSH
 
@@ -89,10 +92,19 @@ When using `./run.sh --remote-images`, presets are rewritten to point to `ghcr.i
 
 ## Worker Image
 
-The worker image is Nix-based:
+The worker image is Debian-based:
 
-- toolchain definition: [`agent-worker/flake.nix`](./agent-worker/flake.nix)
-- pinned inputs: [`agent-worker/flake.lock`](./agent-worker/flake.lock)
+- runtime image definition: [`agent-worker/Dockerfile`](./agent-worker/Dockerfile)
+- worker entrypoint: [`agent-worker/docker-entrypoint.sh`](./agent-worker/docker-entrypoint.sh)
+
+### Extra Computer-Use Setup Script
+
+Computer-use mode ships with a default desktop/browser/tooling stack in the worker image. You can optionally run an extra setup script during startup to add project-specific tools or configuration.
+
+If you do not want to maintain your own setup script yet, use the sample in this repo:
+
+- example value: `./examples/computer-use-extra/setup.sh`
+- sample files: [`examples/computer-use-extra/setup.sh`](./examples/computer-use-extra/setup.sh) and [`examples/computer-use-extra/README.md`](./examples/computer-use-extra/README.md)
 
 ## Notes
 

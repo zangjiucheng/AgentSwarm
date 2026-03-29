@@ -14,6 +14,9 @@ import { destroyWorkerContainer } from "./destroy-worker"
 import { applyGithubAccountToWorker } from "./worker-github"
 import {
   getStoredGithubAccountIdForWorker,
+  getStoredWorkerTitle,
+  setStoredWorkerTitle,
+  transferWorkerTitle,
   transferWorkerGithubAccount,
 } from "./secrets"
 
@@ -22,6 +25,18 @@ const HEALTH_TIMEOUT_MS = 60_000
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function toDockerContainerName(title: string, id: string) {
+  const base = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+
+  const safeBase = base || "worker"
+  return `agentswarm-${safeBase}-${id.slice(0, 8)}`
 }
 
 function sanitizeReplacementEnv(env: Record<string, string>) {
@@ -40,6 +55,7 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "PATH",
     "PWD",
     "SHELL",
+    "DISPLAY",
     "SSH_PORT",
     "SHLVL",
     "USER",
@@ -48,6 +64,12 @@ function sanitizeReplacementEnv(env: Record<string, string>) {
     "WORKER_SSH_ENABLED",
     "WORKER_SSH_PASSWORD",
     "WORKER_SSH_PRIVATE_KEY",
+    "WORKER_COMPUTER_USE_ENABLED",
+    "WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT",
+    "WORKER_COMPUTER_USE_EXTRA_FLAKE_REF",
+    "WORKER_VNC_PASSWORD",
+    "WORKER_VNC_PORT",
+    "WORKER_VNC_RESOLUTION",
     "WORKER_PROFILE",
   ]) {
     delete nextEnv[key]
@@ -135,7 +157,7 @@ export async function stopManagedWorkerContainer(id: string) {
 
 export async function replaceManagedWorkerContainer(
   id: string,
-  options?: { enableSsh?: boolean },
+  options?: { enableSsh?: boolean; enableComputerUse?: boolean },
 ) {
   const container = await findManagedContainerById(id)
 
@@ -156,14 +178,19 @@ export async function replaceManagedWorkerContainer(
   const originalEnv = await getContainerEnv(id)
   const env = sanitizeReplacementEnv(originalEnv)
   const title =
-    inspection.Config.Labels?.[WORKER_TITLE_LABEL] ??
-    inspection.Name.replace(/^\//, "")
+    getStoredWorkerTitle(id) ||
+    (inspection.Config.Labels?.[WORKER_TITLE_LABEL] ??
+      inspection.Name.replace(/^\//, ""))
   const preset =
     inspection.Config.Labels?.[WORKER_PRESET_LABEL] ?? "default"
   const parentId = inspection.Config.Labels?.[WORKER_PARENT_LABEL]
   const githubAccountId = getStoredGithubAccountIdForWorker(id)
   const wasRunning = inspection.State.Running
   const currentSshEnabled = originalEnv.WORKER_SSH_ENABLED === "1"
+  const currentComputerUseEnabled = originalEnv.WORKER_COMPUTER_USE_ENABLED === "1"
+  const currentComputerUseExtraSetupScript =
+    originalEnv.WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT ??
+    originalEnv.WORKER_COMPUTER_USE_EXTRA_FLAKE_REF
 
   let replacement:
     | Awaited<ReturnType<typeof startWorkerContainer>>
@@ -175,6 +202,9 @@ export async function replaceManagedWorkerContainer(
 
   try {
     replacement = await startWorkerContainer({
+      enableComputerUse:
+        options?.enableComputerUse ?? currentComputerUseEnabled,
+      computerUseExtraSetupScript: currentComputerUseExtraSetupScript,
       enableSsh: options?.enableSsh ?? currentSshEnabled,
       env,
       githubAccountId,
@@ -195,6 +225,7 @@ export async function replaceManagedWorkerContainer(
     }
 
     transferWorkerGithubAccount(id, replacement.id)
+    transferWorkerTitle(id, replacement.id)
     await destroyWorkerContainer(id, { removeWorkspaceVolume: false })
 
     clearWorkersCache()
@@ -226,4 +257,24 @@ export async function replaceManagedWorkerContainer(
 
     throw error
   }
+}
+
+export async function renameManagedWorkerContainer(id: string, title: string) {
+  const nextTitle = title.trim()
+
+  if (!nextTitle) {
+    throw new Error("Worker title cannot be empty")
+  }
+
+  const container = await findManagedContainerById(id)
+
+  if (!container) {
+    throw new Error(`No managed worker found for id ${id}`)
+  }
+
+  await container.rename({ name: toDockerContainerName(nextTitle, id) })
+  setStoredWorkerTitle(id, nextTitle)
+  clearWorkersCache()
+
+  return undefined
 }

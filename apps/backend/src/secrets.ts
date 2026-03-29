@@ -25,6 +25,7 @@ const SecretStoreSchema = z.object({
   githubUsername: z.string().default(""),
   sshPublicKeys: z.array(SshPublicKeySchema).default([]),
   workerGithubAccountIds: z.record(z.string(), z.string()).default({}),
+  workerTitles: z.record(z.string(), z.string()).default({}),
 })
 
 type GithubAccount = z.infer<typeof GithubAccountSchema>
@@ -125,6 +126,12 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
       publicKey: normalizeSshPublicKeyValue(key.publicKey),
     })),
     workerGithubAccountIds: filteredWorkerGithubAccountIds,
+    workerTitles: Object.fromEntries(
+      Object.entries(store.workerTitles).map(([workerId, title]) => [
+        workerId,
+        title.trim(),
+      ]),
+    ),
   }
 }
 
@@ -175,6 +182,10 @@ function getDefaultGithubAccount() {
 
 export function getStoredGithubAccountIdForWorker(workerId: string) {
   return secretStore.workerGithubAccountIds[workerId]
+}
+
+export function getStoredWorkerTitle(workerId: string) {
+  return secretStore.workerTitles[workerId]
 }
 
 export function getEffectiveGithubAccountForWorker(workerId: string) {
@@ -400,6 +411,47 @@ export function transferWorkerGithubAccount(oldWorkerId: string, newWorkerId: st
   }
 
   delete nextSecretStore.workerGithubAccountIds[oldWorkerId]
+  persistSecretStore(normalizeSecretStore(nextSecretStore))
+}
+
+export function setStoredWorkerTitle(workerId: string, title: string) {
+  const nextSecretStore = {
+    ...secretStore,
+    workerTitles: {
+      ...secretStore.workerTitles,
+      [workerId]: title.trim(),
+    },
+  }
+
+  persistSecretStore(normalizeSecretStore(nextSecretStore))
+}
+
+export function transferWorkerTitle(oldWorkerId: string, newWorkerId: string) {
+  const nextSecretStore = {
+    ...secretStore,
+    workerTitles: { ...secretStore.workerTitles },
+  }
+  const title = nextSecretStore.workerTitles[oldWorkerId]
+
+  if (title) {
+    nextSecretStore.workerTitles[newWorkerId] = title
+  }
+
+  delete nextSecretStore.workerTitles[oldWorkerId]
+  persistSecretStore(normalizeSecretStore(nextSecretStore))
+}
+
+export function clearStoredWorkerTitle(workerId: string) {
+  if (!secretStore.workerTitles[workerId]) {
+    return
+  }
+
+  const nextSecretStore = {
+    ...secretStore,
+    workerTitles: { ...secretStore.workerTitles },
+  }
+
+  delete nextSecretStore.workerTitles[workerId]
   persistSecretStore(normalizeSecretStore(nextSecretStore))
 }
 

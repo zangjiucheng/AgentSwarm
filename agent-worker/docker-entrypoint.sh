@@ -11,70 +11,31 @@ STARTUP_REPO_URL="${STARTUP_REPO_URL:-}"
 WORKER_SSH_ENABLED="${WORKER_SSH_ENABLED:-0}"
 WORKER_SSH_AUTHORIZED_KEYS="${WORKER_SSH_AUTHORIZED_KEYS:-${WORKER_SSH_AUTHORIZED_KEY:-}}"
 WORKER_SSH_PASSWORD="${WORKER_SSH_PASSWORD:-}"
-BASH_BIN="$(readlink -f "$(command -v bash)")"
-SETPRIV_BIN="$(readlink -f "$(command -v setpriv)")"
-NIX_DAEMON_BIN="$(readlink -f "$(command -v nix-daemon)")"
-BUN_BIN="$(readlink -f "$(command -v bun)")"
-CHPASSWD_BIN="$(readlink -f "$(command -v chpasswd)")"
-SSHD_BIN="$(readlink -f "$(command -v sshd)")"
-SSH_KEYGEN_BIN="$(readlink -f "$(command -v ssh-keygen)")"
+WORKER_COMPUTER_USE_ENABLED="${WORKER_COMPUTER_USE_ENABLED:-0}"
+WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT="${WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT:-${WORKER_COMPUTER_USE_EXTRA_FLAKE_REF:-}}"
+WORKER_VNC_PASSWORD="${WORKER_VNC_PASSWORD:-}"
+WORKER_VNC_PORT="${WORKER_VNC_PORT:-6901}"
+WORKER_VNC_RESOLUTION="${WORKER_VNC_RESOLUTION:-1440x900x24}"
+BASH_BIN="$(command -v bash)"
+SETPRIV_BIN="$(command -v setpriv)"
+BUN_BIN="$(command -v bun)"
+CHPASSWD_BIN="$(command -v chpasswd)"
+SSHD_BIN="$(command -v sshd)"
+SSH_KEYGEN_BIN="$(command -v ssh-keygen)"
 MONITOR_SCRIPT="/usr/local/bin/monitor.js"
+COMPUTER_USE_SCRIPT="/usr/local/bin/computer-use-start"
 BUN_PTY_LIB=""
-ARCH="$(uname -m)"
+DOCKERD_PID=""
+SSHD_PID=""
 
-if [ "$ARCH" = "aarch64" ] && [ -f /usr/local/lib/bun-pty/librust_pty_arm64.so ]; then
-  BUN_PTY_LIB="/usr/local/lib/bun-pty/librust_pty_arm64.so"
-elif [ -f /usr/local/lib/bun-pty/librust_pty.so ]; then
+if [ -f /usr/local/lib/bun-pty/librust_pty.so ]; then
   BUN_PTY_LIB="/usr/local/lib/bun-pty/librust_pty.so"
 elif [ -f /usr/local/lib/bun-pty/librust_pty_arm64.so ]; then
   BUN_PTY_LIB="/usr/local/lib/bun-pty/librust_pty_arm64.so"
 fi
 
-mkdir -p /var/run /var/lib/docker
+mkdir -p /var/run /var/lib/docker /run/sshd
 chown -R 1000:1000 "$HOME_DIR"
-
-"$NIX_DAEMON_BIN" >/tmp/nix-daemon.log 2>&1 &
-NIX_DAEMON_PID=$!
-
-DOCKERD_PID=""
-SSHD_PID=""
-
-append_unique_path_dir() {
-  local current_path="$1"
-  local next_dir="$2"
-
-  if [ -z "$next_dir" ] || [ ! -d "$next_dir" ]; then
-    printf '%s' "$current_path"
-    return 0
-  fi
-
-  case ":$current_path:" in
-    *":$next_dir:"*)
-      printf '%s' "$current_path"
-      ;;
-    *)
-      if [ -n "$current_path" ]; then
-        printf '%s:%s' "$current_path" "$next_dir"
-      else
-        printf '%s' "$next_dir"
-      fi
-      ;;
-  esac
-}
-
-ensure_standard_command_path() {
-  local command_name="$1"
-  local target_bin="$2"
-  local resolved_bin=""
-
-  if ! command -v "$command_name" >/dev/null 2>&1; then
-    return 0
-  fi
-
-  resolved_bin="$(readlink -f "$(command -v "$command_name")")"
-  mkdir -p "$(dirname "$target_bin")"
-  ln -sf "$resolved_bin" "$target_bin"
-}
 
 cleanup_docker_runtime_state() {
   local pid=""
@@ -91,7 +52,7 @@ cleanup_docker_runtime_state() {
     pid="$(cat "$pidfile" 2>/dev/null || true)"
 
     if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
-      case "$(ps -p "$pid" -o comm= 2>/dev/null | tr -d "[:space:]")" in
+      case "$(ps -p "$pid" -o comm= 2>/dev/null | tr -d '[:space:]')" in
         dockerd|containerd)
           kill "$pid" >/dev/null 2>&1 || true
           wait "$pid" 2>/dev/null || true
@@ -106,272 +67,98 @@ cleanup_docker_runtime_state() {
   pkill -x dockerd >/dev/null 2>&1 || true
 }
 
-if docker info >/dev/null 2>&1; then
-  :
-else
+start_dockerd_if_needed() {
+  if docker info >/dev/null 2>&1; then
+    return 0
+  fi
+
   cleanup_docker_runtime_state
 
-  if ! docker info >/dev/null 2>&1; then
-    dockerd \
-      --host=unix:///var/run/docker.sock \
-      --storage-driver=vfs \
-      >/tmp/dockerd.log 2>&1 &
-    DOCKERD_PID=$!
+  if docker info >/dev/null 2>&1; then
+    return 0
   fi
-fi
+
+  dockerd \
+    --host=unix:///var/run/docker.sock \
+    --storage-driver=vfs \
+    >/tmp/dockerd.log 2>&1 &
+  DOCKERD_PID=$!
+
+  for _ in $(seq 1 60); do
+    if docker info >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "dockerd failed to start" >&2
+  cat /tmp/dockerd.log >&2 || true
+  exit 1
+}
 
 setup_vscode_remote_ssh_compat() {
-  local ldconfig_bin=""
-  local bash_bin=""
-  local scp_bin=""
-  local sftp_bin=""
-  local ssh_bin=""
-  local openssh_root=""
-  local sftp_server_bin=""
-  local library_probe_bin=""
-  local compiler_root=""
-  local candidate=""
-  local resolved_candidate=""
-  local dynamic_linker_file=""
-  local dynamic_linker=""
-  local dynamic_linker_name=""
-  local libstdcpp_path=""
-  local libgcc_path=""
-  local fallback_path=""
-  local library_path=""
   local managed_env_file="$HOME_DIR/.agentswarm-shell-env"
+  local bash_profile_file="$HOME_DIR/.bash_profile"
   local zshenv_file="$HOME_DIR/.zshenv"
   local vscode_env_dir="$HOME_DIR/.vscode-server"
   local vscode_env_file="$vscode_env_dir/server-env-setup"
   local source_line="[ -f \"$managed_env_file\" ] && . \"$managed_env_file\""
 
-  ensure_standard_command_path sh /bin/sh
-  ensure_standard_command_path sh /usr/bin/sh
-  ensure_standard_command_path env /usr/bin/env
-  ensure_standard_command_path mkdir /bin/mkdir
-  ensure_standard_command_path mkdir /usr/bin/mkdir
-  ensure_standard_command_path mktemp /usr/bin/mktemp
-  ensure_standard_command_path chmod /bin/chmod
-  ensure_standard_command_path chmod /usr/bin/chmod
-  ensure_standard_command_path dirname /usr/bin/dirname
-  ensure_standard_command_path uname /bin/uname
-  ensure_standard_command_path uname /usr/bin/uname
-  ensure_standard_command_path date /bin/date
-  ensure_standard_command_path date /usr/bin/date
-  ensure_standard_command_path tar /bin/tar
-  ensure_standard_command_path tar /usr/bin/tar
-  ensure_standard_command_path gzip /bin/gzip
-  ensure_standard_command_path gzip /usr/bin/gzip
-  ensure_standard_command_path xz /bin/xz
-  ensure_standard_command_path xz /usr/bin/xz
+  mkdir -p "$vscode_env_dir" /run/current-system/sw/bin /run/current-system/sw/libexec /usr/libexec
 
-  if command -v bash >/dev/null 2>&1; then
-    bash_bin="$(readlink -f "$(command -v bash)")"
-    mkdir -p /bin /usr/bin
-    ln -sf "$bash_bin" /bin/bash
-    ln -sf "$bash_bin" /usr/bin/bash
-  fi
+  [ -x /bin/sh ] || ln -sf "$(command -v sh)" /bin/sh
+  [ -x /usr/bin/env ] || ln -sf "$(command -v env)" /usr/bin/env
+  [ -x /usr/bin/bash ] || ln -sf "$BASH_BIN" /usr/bin/bash
 
   if command -v ssh >/dev/null 2>&1; then
-    ssh_bin="$(readlink -f "$(command -v ssh)")"
-    mkdir -p /usr/bin /run/current-system/sw/bin
-    ln -sf "$ssh_bin" /usr/bin/ssh
-    ln -sf "$ssh_bin" /run/current-system/sw/bin/ssh
-    openssh_root="${ssh_bin%/bin/*}"
-
-    for sftp_server_bin in \
-      "$openssh_root/libexec/sftp-server" \
-      "$openssh_root/lib/openssh/sftp-server"
-    do
-      if [ -f "$sftp_server_bin" ]; then
-        mkdir -p /usr/libexec /usr/lib/openssh /run/current-system/sw/libexec
-        ln -sf "$sftp_server_bin" /usr/libexec/sftp-server
-        ln -sf "$sftp_server_bin" /usr/lib/openssh/sftp-server
-        ln -sf "$sftp_server_bin" /run/current-system/sw/libexec/sftp-server
-        break
-      fi
-    done
+    ln -sf "$(command -v ssh)" /run/current-system/sw/bin/ssh
   fi
-
   if command -v scp >/dev/null 2>&1; then
-    scp_bin="$(readlink -f "$(command -v scp)")"
-    mkdir -p /usr/bin /run/current-system/sw/bin
-    ln -sf "$scp_bin" /usr/bin/scp
-    ln -sf "$scp_bin" /run/current-system/sw/bin/scp
+    ln -sf "$(command -v scp)" /run/current-system/sw/bin/scp
   fi
-
   if command -v sftp >/dev/null 2>&1; then
-    sftp_bin="$(readlink -f "$(command -v sftp)")"
-    mkdir -p /usr/bin /run/current-system/sw/bin
-    ln -sf "$sftp_bin" /usr/bin/sftp
-    ln -sf "$sftp_bin" /run/current-system/sw/bin/sftp
+    ln -sf "$(command -v sftp)" /run/current-system/sw/bin/sftp
   fi
 
-  if command -v ldconfig >/dev/null 2>&1; then
-    ldconfig_bin="$(readlink -f "$(command -v ldconfig)")"
-    mkdir -p /usr/sbin /sbin
-    ln -sf "$ldconfig_bin" /usr/sbin/ldconfig
-    ln -sf "$ldconfig_bin" /sbin/ldconfig
-  fi
-
-  for candidate in \
-    "${NIX_CC:-}" \
-    "$(command -v ld 2>/dev/null || true)" \
-    "$(command -v c++ 2>/dev/null || true)" \
-    "$(command -v g++ 2>/dev/null || true)" \
-    "$(command -v gcc 2>/dev/null || true)"
+  for sftp_server_bin in \
+    /usr/lib/openssh/sftp-server \
+    /usr/libexec/sftp-server
   do
-    if [ -z "$candidate" ]; then
-      continue
-    fi
-
-    for resolved_candidate in \
-      "$candidate" \
-      "$(readlink -f "$candidate" 2>/dev/null || true)"
-    do
-      if [ -z "$resolved_candidate" ] || [ ! -e "$resolved_candidate" ]; then
-        continue
-      fi
-
-      compiler_root="${resolved_candidate%/bin/*}"
-
-      for dynamic_linker_file in \
-        "$compiler_root/nix-support/dynamic-linker" \
-        "$compiler_root/cc/nix-support/dynamic-linker" \
-        "$compiler_root"/lib*/gcc/*/*/../../../nix-support/dynamic-linker
-      do
-        if [ -f "$dynamic_linker_file" ]; then
-          dynamic_linker="$(cat "$dynamic_linker_file")"
-          break 3
-        fi
-      done
-    done
-  done
-
-  for library_probe_bin in \
-    "$(command -v c++ 2>/dev/null || true)" \
-    "$(command -v g++ 2>/dev/null || true)" \
-    "$(command -v gcc 2>/dev/null || true)"
-  do
-    if [ -z "$library_probe_bin" ]; then
-      continue
-    fi
-
-    libstdcpp_path="$("$library_probe_bin" -print-file-name=libstdc++.so.6 2>/dev/null || true)"
-    libgcc_path="$("$library_probe_bin" -print-file-name=libgcc_s.so.1 2>/dev/null || true)"
-
-    if [ -f "$libstdcpp_path" ] || [ -f "$libgcc_path" ]; then
+    if [ -f "$sftp_server_bin" ]; then
+      ln -sf "$sftp_server_bin" /run/current-system/sw/libexec/sftp-server
+      ln -sf "$sftp_server_bin" /usr/libexec/sftp-server
       break
     fi
   done
 
-  if [ -n "$libstdcpp_path" ] && [ ! -f "$libstdcpp_path" ]; then
-    libstdcpp_path=""
-  fi
-
-  if [ -n "$libgcc_path" ] && [ ! -f "$libgcc_path" ]; then
-    libgcc_path=""
-  fi
-
-  if [ -z "$libstdcpp_path" ]; then
-    for fallback_path in \
-      /nix/var/nix/profiles/agentswarm-worker/lib/libstdc++.so.6 \
-      /root/.nix-profile/lib/libstdc++.so.6 \
-      "$(find /nix/store -path '*/agentswarm-worker-env/lib/libstdc++.so.6' -print -quit 2>/dev/null || true)" \
-      "$(find /nix/store -path '*/lib/libstdc++.so.6' -print -quit 2>/dev/null || true)"
-    do
-      if [ -n "$fallback_path" ] && [ -f "$fallback_path" ]; then
-        libstdcpp_path="$fallback_path"
-        break
-      fi
-    done
-  fi
-
-  if [ -z "$libgcc_path" ]; then
-    for fallback_path in \
-      /nix/var/nix/profiles/agentswarm-worker/lib/libgcc_s.so.1 \
-      /root/.nix-profile/lib/libgcc_s.so.1 \
-      "$(find /nix/store -path '*/agentswarm-worker-env/lib/libgcc_s.so.1' -print -quit 2>/dev/null || true)" \
-      "$(find /nix/store -path '*/lib/libgcc_s.so.1' -print -quit 2>/dev/null || true)"
-    do
-      if [ -n "$fallback_path" ] && [ -f "$fallback_path" ]; then
-        libgcc_path="$fallback_path"
-        break
-      fi
-    done
-  fi
-
-  if [ -n "$dynamic_linker" ] && [ -f "$dynamic_linker" ]; then
-    dynamic_linker_name="$(basename "$dynamic_linker")"
-    mkdir -p /lib /lib64
-    ln -sf "$dynamic_linker" "/lib/$dynamic_linker_name"
-    ln -sf "$dynamic_linker" "/lib64/$dynamic_linker_name"
-    library_path="$(append_unique_path_dir "$library_path" "$(dirname "$dynamic_linker")")"
-  fi
-
-  if [ -n "$libstdcpp_path" ] && [ -f "$libstdcpp_path" ]; then
-    mkdir -p /usr/lib /usr/lib64
-    ln -sf "$libstdcpp_path" "/usr/lib/$(basename "$libstdcpp_path")"
-    ln -sf "$libstdcpp_path" "/usr/lib64/$(basename "$libstdcpp_path")"
-    library_path="$(append_unique_path_dir "$library_path" "$(dirname "$libstdcpp_path")")"
-  fi
-
-  if [ -n "$libgcc_path" ] && [ -f "$libgcc_path" ]; then
-    mkdir -p /usr/lib /usr/lib64
-    ln -sf "$libgcc_path" "/usr/lib/$(basename "$libgcc_path")"
-    ln -sf "$libgcc_path" "/usr/lib64/$(basename "$libgcc_path")"
-    library_path="$(append_unique_path_dir "$library_path" "$(dirname "$libgcc_path")")"
-  fi
-
-  mkdir -p "$vscode_env_dir"
-
   {
     printf '# Generated by agent-worker-entrypoint for VS Code Remote-SSH.\n'
-
-    if [ -n "$dynamic_linker" ] && [ -f "$dynamic_linker" ]; then
-      printf 'export NIX_LD=%q\n' "$dynamic_linker"
-    fi
-
-    if [ -n "$library_path" ]; then
-      printf 'export NIX_LD_LIBRARY_PATH=%q\n' "$library_path"
-      printf 'if [ -n "${LD_LIBRARY_PATH:-}" ]; then\n'
-      printf '  export LD_LIBRARY_PATH=%q:"${LD_LIBRARY_PATH}"\n' "$library_path"
-      printf 'else\n'
-      printf '  export LD_LIBRARY_PATH=%q\n' "$library_path"
-      printf 'fi\n'
+    printf 'export PATH=%q\n' "/home/kasm-user/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    if [ -n "$BUN_PTY_LIB" ]; then
+      printf 'export BUN_PTY_LIB=%q\n' "$BUN_PTY_LIB"
     fi
   } > "$managed_env_file"
 
   chmod 600 "$managed_env_file"
   chown 1000:1000 "$managed_env_file"
 
-  touch "$zshenv_file"
+  touch "$zshenv_file" "$bash_profile_file"
   if ! grep -Fqx "$source_line" "$zshenv_file"; then
     printf '\n%s\n' "$source_line" >> "$zshenv_file"
   fi
-  chmod 644 "$zshenv_file"
-  chown 1000:1000 "$zshenv_file"
+  if ! grep -Fqx "$source_line" "$bash_profile_file"; then
+    printf '\n%s\n' "$source_line" >> "$bash_profile_file"
+  fi
+  if ! grep -Fqx '[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"' "$bash_profile_file"; then
+    printf '%s\n' '[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"' >> "$bash_profile_file"
+  fi
+  chmod 644 "$zshenv_file" "$bash_profile_file"
+  chown 1000:1000 "$zshenv_file" "$bash_profile_file"
 
   {
     printf '#!/usr/bin/env bash\n'
     printf 'set -eu\n'
     printf '%s\n' "$source_line"
-    printf '\n'
-    printf '# Patch downloaded VS Code server binaries into the active Nix runtime.\n'
-    printf 'if command -v patchelf >/dev/null 2>&1 && [ -n "${NIX_LD:-}" ] && [ -n "${NIX_LD_LIBRARY_PATH:-}" ]; then\n'
-    printf '  if [ -n "${ZSH_VERSION:-}" ]; then\n'
-    printf '    setopt local_options nonomatch 2>/dev/null || true\n'
-    printf '  fi\n'
-    printf '  for node_path in "$HOME/.vscode-server/bin/"*/node "$HOME/.vscode-server/cli/servers/"*/server/node; do\n'
-    printf '    [ -f "$node_path" ] || continue\n'
-    printf '    current_interpreter="$(patchelf --print-interpreter "$node_path" 2>/dev/null || true)"\n'
-    printf '    current_rpath="$(patchelf --print-rpath "$node_path" 2>/dev/null || true)"\n'
-    printf '    if [ "$current_interpreter" = "$NIX_LD" ] && [ "$current_rpath" = "$NIX_LD_LIBRARY_PATH" ]; then\n'
-    printf '      continue\n'
-    printf '    fi\n'
-    printf '    patchelf --set-interpreter "$NIX_LD" --set-rpath "$NIX_LD_LIBRARY_PATH" "$node_path" >/dev/null 2>&1 || true\n'
-    printf '  done\n'
-    printf 'fi\n'
   } > "$vscode_env_file"
 
   chmod 700 "$vscode_env_file"
@@ -379,50 +166,14 @@ setup_vscode_remote_ssh_compat() {
 }
 
 setup_sshd() {
+  local sftp_server_bin="/usr/lib/openssh/sftp-server"
+
   if [ "$WORKER_SSH_ENABLED" != "1" ]; then
     return 0
   fi
 
   mkdir -p /etc/ssh /run /run/sshd /var/empty
   chmod 755 /run /run/sshd /var/empty
-
-  if [ -L /etc/group ]; then
-    cp -L /etc/group /tmp/group
-    rm -f /etc/group
-    cp /tmp/group /etc/group
-    chmod 644 /etc/group
-  fi
-
-  if [ -L /etc/passwd ]; then
-    cp -L /etc/passwd /tmp/passwd
-    rm -f /etc/passwd
-    cp /tmp/passwd /etc/passwd
-    chmod 644 /etc/passwd
-  fi
-
-  if [ -L /etc/shadow ]; then
-    cp -L /etc/shadow /tmp/shadow
-    rm -f /etc/shadow
-    cp /tmp/shadow /etc/shadow
-    chmod 600 /etc/shadow
-  fi
-
-  local user_shell=""
-  user_shell="$(grep '^kasm-user:' /etc/passwd | cut -d: -f7 || true)"
-  touch /etc/shells
-  chmod 644 /etc/shells
-
-  if ! grep -q '^sshd:' /etc/group; then
-    printf 'sshd:x:74:\n' >> /etc/group
-  fi
-
-  if ! grep -q '^sshd:' /etc/passwd; then
-    printf 'sshd:x:74:74:OpenSSH privilege separation:/var/empty:/bin/sh\n' >> /etc/passwd
-  fi
-
-  if [ -n "$user_shell" ] && ! grep -Fxq "$user_shell" /etc/shells; then
-    printf '%s\n' "$user_shell" >> /etc/shells
-  fi
 
   mkdir -p "$HOME_DIR/.ssh"
   chmod 700 "$HOME_DIR/.ssh"
@@ -437,7 +188,7 @@ setup_sshd() {
   fi
 
   if [ -z "$WORKER_SSH_AUTHORIZED_KEYS" ] && [ -n "$WORKER_SSH_PASSWORD" ]; then
-    printf 'kasm-user:%s\n' "$WORKER_SSH_PASSWORD" | "$CHPASSWD_BIN" -c SHA512
+    printf 'kasm-user:%s\n' "$WORKER_SSH_PASSWORD" | "$CHPASSWD_BIN"
   fi
 
   if [ ! -f /etc/ssh/ssh_host_ed25519_key ]; then
@@ -445,6 +196,10 @@ setup_sshd() {
       cat /tmp/ssh-keygen.log >&2 || true
       return 1
     }
+  fi
+
+  if [ ! -f "$sftp_server_bin" ] && [ -f /usr/libexec/sftp-server ]; then
+    sftp_server_bin="/usr/libexec/sftp-server"
   fi
 
   cat > /etc/ssh/sshd_config <<EOF
@@ -469,7 +224,7 @@ AllowTcpForwarding yes
 AllowStreamLocalForwarding yes
 GatewayPorts no
 ClientAliveInterval 30
-Subsystem sftp /run/current-system/sw/libexec/sftp-server
+Subsystem sftp $sftp_server_bin
 LogLevel VERBOSE
 EOF
 
@@ -477,24 +232,10 @@ EOF
   SSHD_PID=$!
 }
 
-setup_vscode_remote_ssh_compat
-setup_sshd
-
-if [ -f "$HOME_DIR/.agentswarm-shell-env" ]; then
-  # Make toolchain/runtime compatibility vars available to code-server and
-  # any terminals or subprocesses it launches, not just Remote-SSH sessions.
-  . "$HOME_DIR/.agentswarm-shell-env"
-fi
-
 cleanup() {
   if [ -n "$SSHD_PID" ] && kill -0 "$SSHD_PID" >/dev/null 2>&1; then
     kill "$SSHD_PID" >/dev/null 2>&1 || true
     wait "$SSHD_PID" 2>/dev/null || true
-  fi
-
-  if kill -0 "$NIX_DAEMON_PID" >/dev/null 2>&1; then
-    kill "$NIX_DAEMON_PID" >/dev/null 2>&1 || true
-    wait "$NIX_DAEMON_PID" 2>/dev/null || true
   fi
 
   if [ -n "$DOCKERD_PID" ] && kill -0 "$DOCKERD_PID" >/dev/null 2>&1; then
@@ -505,17 +246,12 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-for _ in $(seq 1 60); do
-  if docker info >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
+start_dockerd_if_needed
+setup_vscode_remote_ssh_compat
+setup_sshd
 
-if ! docker info >/dev/null 2>&1; then
-  echo "dockerd failed to start" >&2
-  cat /tmp/dockerd.log >&2 || true
-  exit 1
+if [ -f "$HOME_DIR/.agentswarm-shell-env" ]; then
+  . "$HOME_DIR/.agentswarm-shell-env"
 fi
 
 exec "$SETPRIV_BIN" \
@@ -524,15 +260,20 @@ exec "$SETPRIV_BIN" \
   --init-groups \
   env \
   HOME="$HOME_DIR" \
-  NIX_REMOTE=daemon \
   USER="kasm-user" \
   WORKSPACE_DIR="$WORKSPACE_DIR" \
   STARTUP_REPO_URL="$STARTUP_REPO_URL" \
   CODE_SERVER_PORT="$CODE_SERVER_PORT" \
   MONITOR_PORT="$MONITOR_PORT" \
+  WORKER_COMPUTER_USE_ENABLED="$WORKER_COMPUTER_USE_ENABLED" \
+  WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT="$WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT" \
+  WORKER_VNC_PASSWORD="$WORKER_VNC_PASSWORD" \
+  WORKER_VNC_PORT="$WORKER_VNC_PORT" \
+  WORKER_VNC_RESOLUTION="$WORKER_VNC_RESOLUTION" \
   BUN_BIN="$BUN_BIN" \
   BUN_PTY_LIB="$BUN_PTY_LIB" \
   MONITOR_SCRIPT="$MONITOR_SCRIPT" \
+  COMPUTER_USE_SCRIPT="$COMPUTER_USE_SCRIPT" \
   "$BASH_BIN" -lc '
     set -euo pipefail
 
@@ -700,6 +441,20 @@ EOF
     fi
 
     configure_github_auth
+
+    if [ "$WORKER_COMPUTER_USE_ENABLED" = "1" ]; then
+      sudo env \
+        HOME=/root \
+        WORKER_HOME_DIR="$HOME" \
+        WORKSPACE_DIR="$WORKSPACE_DIR" \
+        WORKER_COMPUTER_USE_ENABLED="$WORKER_COMPUTER_USE_ENABLED" \
+        WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT="$WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT" \
+        WORKER_COMPUTER_USE_EXTRA_FLAKE_REF="$WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT" \
+        WORKER_VNC_PASSWORD="$WORKER_VNC_PASSWORD" \
+        WORKER_VNC_PORT="$WORKER_VNC_PORT" \
+        WORKER_VNC_RESOLUTION="$WORKER_VNC_RESOLUTION" \
+        "$COMPUTER_USE_SCRIPT" >/tmp/computer-use.log 2>&1 &
+    fi
 
     "$BUN_BIN" "$MONITOR_SCRIPT" >/tmp/monitor.log 2>&1 &
 
