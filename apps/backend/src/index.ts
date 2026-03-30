@@ -1,8 +1,9 @@
 import { createBunServeHandler } from "trpc-bun-adapter"
 import { resolve } from "node:path"
-import { port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath, adminToken } from "./config"
+import { port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath } from "./config"
 import { appRouter, type TRPCContext } from "./router"
 import { initializeAutoPauseScheduler } from "./auto-pause"
+import { getConfiguredAdminToken } from "./secrets"
 import { initializeWorkerContainerRuntime, selfIp } from "./worker-container"
 
 const requestIpMap = new WeakMap<Request, string>()
@@ -94,11 +95,16 @@ const handler = createBunServeHandler(
   {
     endpoint: "/api/trpc",
     router: appRouter,
-    createContext: ({ req }: { req: Request }): TRPCContext => ({
-      clientIp: requestIpMap.get(req),
-      isAdminAuthed:
-        adminToken.length > 0 && readAdminTokenFromRequest(req) === adminToken,
-    }),
+    createContext: ({ req }: { req: Request }): TRPCContext => {
+      const configuredAdminToken = getConfiguredAdminToken().token
+
+      return {
+        clientIp: requestIpMap.get(req),
+        isAdminAuthed:
+          configuredAdminToken.length > 0 &&
+          readAdminTokenFromRequest(req) === configuredAdminToken,
+      }
+    },
   },
   {
     port,

@@ -32,6 +32,56 @@ else
   GENERATED_CONFIG_DIR="${GENERATED_CONFIG_DIR:-${HOME:-/tmp}/.agentswarm}"
 fi
 TMP_CONFIG_FILE=""
+GENERATED_ADMIN_TOKEN_FILE=""
+
+generate_admin_token() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+    return 0
+  fi
+
+  local python_bin=""
+  python_bin="$(find_python_bin || true)"
+  if [ -n "$python_bin" ]; then
+    "$python_bin" - <<'PY'
+import secrets
+print(secrets.token_hex(32))
+PY
+    return 0
+  fi
+
+  if [ -r /dev/urandom ] && command -v od >/dev/null 2>&1; then
+    od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_admin_token() {
+  if [ -n "${AGENTSWARM_ADMIN_TOKEN:-}" ]; then
+    printf '%s\n' "$AGENTSWARM_ADMIN_TOKEN"
+    return 0
+  fi
+
+  mkdir -p "$GENERATED_CONFIG_DIR"
+  GENERATED_ADMIN_TOKEN_FILE="$GENERATED_CONFIG_DIR/${CONTAINER_NAME}-admin-token"
+
+  if [ -f "$GENERATED_ADMIN_TOKEN_FILE" ]; then
+    cat "$GENERATED_ADMIN_TOKEN_FILE"
+    return 0
+  fi
+
+  local generated=""
+  generated="$(generate_admin_token)" || {
+    echo "Failed to generate AGENTSWARM_ADMIN_TOKEN automatically." >&2
+    exit 1
+  }
+
+  printf '%s\n' "$generated" > "$GENERATED_ADMIN_TOKEN_FILE"
+  chmod 600 "$GENERATED_ADMIN_TOKEN_FILE" 2>/dev/null || true
+  printf '%s\n' "$generated"
+}
 
 find_python_bin() {
   local candidate=""
@@ -290,12 +340,15 @@ if command -v docker >/dev/null 2>&1; then
   fi
 fi
 
+AGENTSWARM_ADMIN_TOKEN_VALUE="$(resolve_admin_token)"
+
 DOCKER_ARGS=(
   run
   -d
   --name "$CONTAINER_NAME"
   -e "AGENTSWARM_VERSION=$IMAGE_TAG"
   -e "AGENTSWARM_WORKER_VERSION=$WORKER_IMAGE_TAG"
+  -e "AGENTSWARM_ADMIN_TOKEN=$AGENTSWARM_ADMIN_TOKEN_VALUE"
   -e "PORT=$PORT"
   -p "$PORT:$PORT"
   -v /var/run/docker.sock:/var/run/docker.sock
@@ -319,6 +372,10 @@ docker "${DOCKER_ARGS[@]}"
 echo "AgentSwarm is running at http://localhost:$PORT"
 echo "App image: $IMAGE_TAG"
 echo "Worker image: $WORKER_IMAGE_TAG"
+echo "Admin token: $AGENTSWARM_ADMIN_TOKEN_VALUE"
+if [ -n "$GENERATED_ADMIN_TOKEN_FILE" ]; then
+  echo "Saved admin token: $GENERATED_ADMIN_TOKEN_FILE"
+fi
 
 if [ "$USE_REMOTE_IMAGES" -eq 1 ]; then
   echo "Remote image mode is enabled."

@@ -17,6 +17,7 @@ const SshPublicKeySchema = z.object({
 })
 
 const SecretStoreSchema = z.object({
+  adminToken: z.string().default(""),
   autoPauseMinutes: z.number().int().nonnegative().nullable().default(null),
   defaultGithubAccountId: z.string().default(""),
   githubAccounts: z.array(GithubAccountSchema).default([]),
@@ -83,6 +84,7 @@ function assertValidSshPublicKey(publicKey: string) {
 function normalizeSecretStore(store: SecretStore): SecretStore {
   const githubAccounts = [...store.githubAccounts]
   const seenIds = new Set(githubAccounts.map((account) => account.id))
+  const adminToken = store.adminToken.trim()
   const autoPauseMinutes =
     store.autoPauseMinutes == null || store.autoPauseMinutes <= 0
       ? null
@@ -99,6 +101,7 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
     : githubAccounts[0]?.id ?? ""
 
   return {
+    adminToken,
     autoPauseMinutes,
     defaultGithubAccountId,
     githubAccounts,
@@ -114,6 +117,31 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
         title.trim(),
       ]),
     ),
+  }
+}
+
+export function getConfiguredAdminToken() {
+  const dashboardToken = secretStore.adminToken.trim()
+
+  if (dashboardToken) {
+    return {
+      token: dashboardToken,
+      source: "dashboard" as const,
+    }
+  }
+
+  const envToken = readEnv("AGENTSWARM_ADMIN_TOKEN", "").trim()
+
+  if (envToken) {
+    return {
+      token: envToken,
+      source: "environment" as const,
+    }
+  }
+
+  return {
+    token: "",
+    source: null,
   }
 }
 
@@ -243,8 +271,11 @@ export function getEffectiveGithubAccountForWorker(workerId: string) {
 
 export function getGlobalSettings() {
   const defaultAccount = getDefaultGithubAccount()
+  const adminToken = getConfiguredAdminToken()
 
   return {
+    adminTokenConfigured: adminToken.token.length > 0,
+    adminTokenSource: adminToken.source,
     autoPauseMinutes: secretStore.autoPauseMinutes,
     defaultGithubAccountId: defaultAccount?.id ?? null,
     githubAccounts: secretStore.githubAccounts.map(toPublicGithubAccount),
@@ -294,6 +325,28 @@ export function saveGlobalSettings(input: {
     ...secretStore,
     autoPauseMinutes:
       input.autoPauseMinutes === undefined ? secretStore.autoPauseMinutes : input.autoPauseMinutes,
+  })
+  persistSecretStore(nextSecretStore)
+
+  return getGlobalSettings()
+}
+
+export function saveAdminToken(input: {
+  adminToken: string
+}) {
+  const nextSecretStore = normalizeSecretStore({
+    ...secretStore,
+    adminToken: input.adminToken.trim(),
+  })
+  persistSecretStore(nextSecretStore)
+
+  return getGlobalSettings()
+}
+
+export function clearAdminToken() {
+  const nextSecretStore = normalizeSecretStore({
+    ...secretStore,
+    adminToken: "",
   })
   persistSecretStore(nextSecretStore)
 

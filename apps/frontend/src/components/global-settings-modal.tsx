@@ -14,7 +14,7 @@ import {
 } from "@tabler/icons-react"
 import { useEffect, useMemo, useState } from "react"
 import type { GlobalSettings } from "../lib/api-types"
-import { trpc } from "../trpc"
+import { clearAdminToken as clearStoredAdminToken, setAdminToken, trpc } from "../trpc"
 
 type GlobalSettingsModalProps = {
   isOpen: boolean
@@ -32,6 +32,7 @@ export function GlobalSettingsModal({
   const utils = trpc.useUtils()
   const [activeSection, setActiveSection] = useState<SettingsSection>("github")
   const [accountName, setAccountName] = useState("")
+  const [adminToken, setAdminTokenValue] = useState("")
   const [autoPauseMinutes, setAutoPauseMinutes] = useState("")
   const [githubUsername, setGithubUsername] = useState("")
   const [githubToken, setGithubToken] = useState("")
@@ -57,6 +58,29 @@ export function GlobalSettingsModal({
   const saveGlobalSettings = trpc.saveGlobalSettings.useMutation({
     onSuccess: refreshQueries,
   })
+  const saveAdminTokenMutation = trpc.saveAdminToken.useMutation({
+    onSuccess: async () => {
+      const nextToken = adminToken.trim()
+      setAdminToken(nextToken)
+      setAdminTokenValue("")
+      await refreshQueries()
+    },
+  })
+  const clearAdminTokenMutation = trpc.clearAdminToken.useMutation({
+    onSuccess: async () => {
+      const fallbackToken = import.meta.env.VITE_AGENTSWARM_ADMIN_TOKEN?.trim() ?? ""
+
+      if (fallbackToken) {
+        setAdminToken(fallbackToken)
+      } else {
+        clearStoredAdminToken()
+      }
+
+      setAdminTokenValue("")
+      await refreshQueries()
+      window.location.reload()
+    },
+  })
 
   const saveSshPublicKey = trpc.saveSshPublicKey.useMutation({
     onSuccess: async () => {
@@ -81,6 +105,7 @@ export function GlobalSettingsModal({
   const resetState = () => {
     setActiveSection("github")
     setAccountName("")
+    setAdminTokenValue("")
     setAutoPauseMinutes(
       settings.autoPauseMinutes == null ? "" : String(settings.autoPauseMinutes),
     )
@@ -89,6 +114,8 @@ export function GlobalSettingsModal({
     setSshKeyName("")
     setSshPublicKey("")
     saveGlobalSettings.reset()
+    saveAdminTokenMutation.reset()
+    clearAdminTokenMutation.reset()
     saveGithubAccount.reset()
     saveSshPublicKey.reset()
     deleteGithubAccount.reset()
@@ -141,12 +168,16 @@ export function GlobalSettingsModal({
 
   const errorMessage =
     saveGlobalSettings.error?.message ??
+    saveAdminTokenMutation.error?.message ??
+    clearAdminTokenMutation.error?.message ??
     saveGithubAccount.error?.message ??
     saveSshPublicKey.error?.message ??
     deleteGithubAccount.error?.message ??
     deleteSshPublicKey.error?.message ??
     setDefaultGithubAccount.error?.message
 
+  const canSaveAdminToken = adminToken.trim().length > 0
+  const canClearAdminToken = settings.adminTokenSource === "dashboard"
   const activeAction =
     activeSection === "github"
       ? {
@@ -354,6 +385,69 @@ export function GlobalSettingsModal({
                       <p className="text-default-500 mt-1 text-xs">
                         Configure dashboard-wide runtime defaults.
                       </p>
+                    </div>
+
+                    <div className="space-y-4 rounded-xl border border-default-200 px-4 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-default-800">
+                          Dashboard admin token
+                        </p>
+                        <p className="text-default-500 mt-1 text-xs">
+                          This token protects the dashboard and TRPC API. Saving here overrides the environment token for future logins.
+                        </p>
+                        <p className="text-default-400 mt-2 text-xs">
+                          Current source:{" "}
+                          {settings.adminTokenSource === "dashboard"
+                            ? "saved in dashboard settings"
+                            : settings.adminTokenSource === "environment"
+                              ? "server environment variable"
+                              : "not configured"}
+                        </p>
+                      </div>
+                      <Input
+                        description="Enter a new shared admin token. This updates the current browser session after save."
+                        label="New admin token"
+                        onValueChange={setAdminTokenValue}
+                        placeholder="Set a new admin token"
+                        type="password"
+                        value={adminToken}
+                      />
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          color="danger"
+                          isDisabled={!canClearAdminToken}
+                          isLoading={clearAdminTokenMutation.isPending}
+                          onPress={() => {
+                            if (
+                              !window.confirm(
+                                "Clear the dashboard-saved admin token and fall back to the environment token if one exists?",
+                              )
+                            ) {
+                              return
+                            }
+
+                            clearAdminTokenMutation.mutate()
+                          }}
+                          size="sm"
+                          variant="light"
+                        >
+                          Clear saved token
+                        </Button>
+                        <Button
+                          color="primary"
+                          isDisabled={!canSaveAdminToken}
+                          isLoading={saveAdminTokenMutation.isPending}
+                          onPress={() =>
+                            saveAdminTokenMutation.mutate({
+                              adminToken: adminToken.trim(),
+                            })
+                          }
+                          size="sm"
+                          variant="flat"
+                        >
+                          Save admin token
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-4 rounded-xl border border-default-200 px-4 py-4">

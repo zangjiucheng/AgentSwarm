@@ -140,8 +140,6 @@ const frontendDevServer = readEnv(
 const frontendDist =
   readEnv("FRONTEND_DIST") ?? resolve(currentDir, "../../frontend/dist")
 const frontendIndexPath = resolve(frontendDist, "index.html")
-const adminToken = readEnv("AGENTSWARM_ADMIN_TOKEN", "").trim()
-
 export {
   config,
   port,
@@ -150,5 +148,4 @@ export {
   frontendDevServer,
   frontendDist,
   frontendIndexPath,
-  adminToken,
 }

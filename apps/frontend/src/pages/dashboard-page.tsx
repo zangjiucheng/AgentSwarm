@@ -56,6 +56,8 @@ export function DashboardPage() {
   const hierarchy = workersQuery.data?.hierarchy ?? EMPTY_HIERARCHY
   const presets = presetsQuery.data ?? []
   const globalSettings = globalSettingsQuery.data ?? {
+    adminTokenConfigured: false,
+    adminTokenSource: null,
     autoPauseMinutes: null,
     defaultGithubAccountId: null,
     githubAccounts: [],

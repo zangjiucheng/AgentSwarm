@@ -14,6 +14,8 @@ export type WorkerStatus = "ready" | "error" | "stopped"
 export type ComputerUseStatus = "disabled" | "preparing" | "ready" | "error"
 
 export type GlobalSettings = {
+  adminTokenConfigured: boolean
+  adminTokenSource: "dashboard" | "environment" | null
   autoPauseMinutes: number | null
   defaultGithubAccountId: string | null
   githubAccounts: GithubAccount[]

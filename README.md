@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/zangjiucheng/AgentSwarm/refs/heads/
 
 Open `http://localhost:14000` after startup.
 
-Set `AGENTSWARM_ADMIN_TOKEN` on the backend and `VITE_AGENTSWARM_ADMIN_TOKEN` in the frontend build, or enter the admin token in the dashboard when prompted.
+Set `AGENTSWARM_ADMIN_TOKEN` on the backend and `VITE_AGENTSWARM_ADMIN_TOKEN` in the frontend build, or enter the admin token in the dashboard when prompted. After login, you can rotate the shared admin token from `Settings`.
 
 ### Uninstall
 

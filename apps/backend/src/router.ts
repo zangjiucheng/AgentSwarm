@@ -9,13 +9,16 @@ import {
 import { destroyWorkerContainer } from "./destroy-worker"
 import { clearWorkersCache, listWorkers } from "./list-workers"
 import { startWorkerContainer } from "./start-worker"
-import { adminToken, config } from "./config"
+import { config } from "./config"
 import {
   assignWorkerGithubAccount,
+  clearAdminToken,
   deleteGithubAccount,
   deleteSshPublicKey,
+  getConfiguredAdminToken,
   getGlobalSettings,
   getStoredGithubAccountIdForWorker,
+  saveAdminToken,
   saveGithubAccount,
   saveGlobalSettings,
   saveSshPublicKey,
@@ -55,7 +58,7 @@ const t = initTRPC.context<TRPCContext>().create()
 export const router = t.router
 export const publicProcedure = t.procedure
 export const authedProcedure = t.procedure.use(({ ctx, next }) => {
-  if (!adminToken) {
+  if (!getConfiguredAdminToken().token) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "Admin token auth is not configured on the server",
@@ -169,6 +172,8 @@ const presetsSchema = z.array(
 )
 
 const globalSettingsSchema = z.object({
+  adminTokenConfigured: z.boolean(),
+  adminTokenSource: z.enum(["dashboard", "environment"]).nullable(),
   autoPauseMinutes: z.number().int().positive().nullable(),
   defaultGithubAccountId: z.string().nullable(),
   githubAccounts: z.array(
@@ -216,6 +221,21 @@ export const appRouter = router({
     .output(globalSettingsSchema)
     .mutation(async ({ input }) => {
       return saveGlobalSettings(input)
+    }),
+  saveAdminToken: authedProcedure
+    .input(
+      z.object({
+        adminToken: z.string().trim().min(1),
+      }),
+    )
+    .output(globalSettingsSchema)
+    .mutation(({ input }) => {
+      return saveAdminToken(input)
+    }),
+  clearAdminToken: authedProcedure
+    .output(globalSettingsSchema)
+    .mutation(() => {
+      return clearAdminToken()
     }),
   saveGithubAccount: authedProcedure
     .input(

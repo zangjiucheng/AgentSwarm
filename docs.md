@@ -71,6 +71,7 @@ The dashboard stores settings in AgentSwarm's own persistent backend volume, not
 
 Current dashboard-managed settings include:
 
+- shared admin token rotation
 - saved GitHub accounts
 - default GitHub account selection
 - worker auto-pause timeout
@@ -87,7 +88,7 @@ Optional:
 - `OPENAI_API_KEY`: available inside workers for Codex and other OpenAI tooling
 - `GITHUB_TOKEN`: enables authenticated GitHub operations when provided directly
 
-For browser access, either bake `VITE_AGENTSWARM_ADMIN_TOKEN` into the frontend build or enter the admin token in the dashboard prompt.
+For browser access, either bake `VITE_AGENTSWARM_ADMIN_TOKEN` into the frontend build or enter the admin token in the dashboard prompt. After login, you can rotate the shared admin token from `Settings`; a token saved there takes precedence over the environment token.
 
 GitHub accounts configured from the dashboard are injected into newly created workers automatically.
 
