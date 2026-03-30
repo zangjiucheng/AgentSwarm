@@ -248,11 +248,16 @@ launch_terminal() {
 launch_browser() {
   run_as_worker_background "
     mkdir -p '$WORKER_HOME_DIR/.config/chromium-agentswarm'
+    rm -f \
+      '$WORKER_HOME_DIR/.config/chromium-agentswarm/SingletonLock' \
+      '$WORKER_HOME_DIR/.config/chromium-agentswarm/SingletonSocket' \
+      '$WORKER_HOME_DIR/.config/chromium-agentswarm/SingletonCookie'
 
     if command -v chromium >/dev/null 2>&1; then
       exec chromium \
         --no-sandbox \
         --disable-dev-shm-usage \
+        --new-window \
         --remote-debugging-address=127.0.0.1 \
         --remote-debugging-port='$CHROMIUM_DEBUG_PORT' \
         --user-data-dir='$WORKER_HOME_DIR/.config/chromium-agentswarm' \

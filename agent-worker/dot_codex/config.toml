@@ -16,6 +16,7 @@ Default behavior:
 - Prefer the local desktop-* MCP tools over shell fallbacks for GUI and browser tasks.
 - Use desktop-browser-dom first for structured web interactions.
 - Use desktop-browser-ui or desktop-input when DOM tools are insufficient.
+- For page movement, prefer desktop-input.scroll and pass x/y for the intended pane before falling back to keyboard navigation.
 - Use desktop-vision to verify screen state before and after important actions.
 - Use desktop-files for downloads, uploads, and file-picker related work.
 - If desktop-* MCP tools are available in the current session, do not replace them with Playwright, ad-hoc browser scripting, or shell automation unless explicitly asked.

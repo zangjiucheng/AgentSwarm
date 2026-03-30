@@ -9,7 +9,8 @@ import {
 import { startMcpServer } from "./lib/mcp-server.mjs";
 
 async function moveMouse({ x, y }) {
-  await run("xdotool", ["mousemove", String(x), String(y)]);
+  await run("xdotool", ["mousemove", "--sync", String(x), String(y)]);
+  await sleep(50);
   return cursorState();
 }
 
@@ -23,15 +24,20 @@ async function click({
   if (typeof x === "number" && typeof y === "number") {
     await moveMouse({ x, y });
   }
-  await run("xdotool", [
-    "click",
-    "--repeat",
-    String(repeat),
-    "--delay",
-    String(delayMs),
-    String(button),
-  ]);
-  return { ok: true };
+
+  for (let index = 0; index < repeat; index += 1) {
+    await run("xdotool", ["mousedown", String(button)]);
+    await sleep(Math.max(30, Math.min(250, delayMs)));
+    await run("xdotool", ["mouseup", String(button)]);
+    if (index < repeat - 1) {
+      await sleep(delayMs);
+    }
+  }
+
+  return {
+    ok: true,
+    cursor: await cursorState(),
+  };
 }
 
 async function pressKey({ key }) {
@@ -50,17 +56,32 @@ async function typeText({ text, delayMs = 20 }) {
   return { ok: true, length: text.length };
 }
 
-async function scroll({ direction = "down", clicks = 3 }) {
+async function scrollWheel({ direction = "down", clicks = 3 }) {
+  const normalizedClicks = Math.max(1, Math.min(40, Number(clicks) || 3));
   const button = direction === "up" ? "4" : "5";
   await run("xdotool", [
     "click",
     "--repeat",
-    String(clicks),
+    String(normalizedClicks),
     "--delay",
     "80",
     button,
   ]);
-  return { ok: true };
+  return { ok: true, direction, clicks: normalizedClicks };
+}
+
+async function scroll({
+  direction = "down",
+  clicks = 3,
+  x,
+  y,
+} = {}) {
+  if (typeof x === "number" && typeof y === "number") {
+    await moveMouse({ x, y });
+    await sleep(80);
+  }
+
+  return scrollWheel({ direction, clicks });
 }
 
 async function drag({
@@ -138,12 +159,15 @@ const tools = [
   },
   {
     name: "scroll",
-    description: "Scroll the mouse wheel up or down.",
+    description:
+      "Scroll the mouse wheel up or down, optionally after moving to specific coordinates so the intended pane scrolls.",
     inputSchema: {
       type: "object",
       properties: {
         direction: { type: "string", enum: ["up", "down"] },
         clicks: { type: "number" },
+        x: { type: "number" },
+        y: { type: "number" },
       },
     },
   },

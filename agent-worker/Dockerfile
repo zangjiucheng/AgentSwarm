@@ -134,6 +134,7 @@ COPY --from=codex-installer /usr/local/lib/node_modules /usr/local/lib/node_modu
 COPY --from=mcp-sdk-installer /opt/agentswarm-mcp/node_modules /home/kasm-user/.codex/mcp/node_modules
 
 COPY --chown=1000:1000 agent-worker/dot_codex /home/kasm-user/.codex
+COPY --chown=1000:1000 agent-worker/mcp/lib /home/kasm-user/.codex/mcp/lib
 COPY --chown=1000:1000 agent-worker/mcp /home/kasm-user/.codex/mcp
 COPY --chown=1000:1000 agent-worker/dot_agent/skills /home/kasm-user/.codex/skills
 COPY agent-worker/codex-mcp-config.toml /usr/local/share/agentswarm/codex-mcp-config.toml
