@@ -9,7 +9,7 @@ import {
 import { destroyWorkerContainer } from "./destroy-worker"
 import { clearWorkersCache, listWorkers } from "./list-workers"
 import { startWorkerContainer } from "./start-worker"
-import { config } from "./config"
+import { adminToken, config } from "./config"
 import {
   assignWorkerGithubAccount,
   deleteGithubAccount,
@@ -35,15 +35,94 @@ import {
   applyGithubAccountsToRunningWorkers,
 } from "./worker-github"
 import { readComputerUseState } from "./computer-use"
+import {
+  getWorkerOutput,
+  setWorkerOutput,
+} from "./worker-output-store"
 
 export type TRPCContext = {
   clientIp: string | undefined
+  isAdminAuthed: boolean
+  workerCaller?: {
+    id: string
+    parentId?: string
+    preset?: string
+  }
 }
 
 const t = initTRPC.context<TRPCContext>().create()
 
 export const router = t.router
 export const publicProcedure = t.procedure
+export const authedProcedure = t.procedure.use(({ ctx, next }) => {
+  if (!adminToken) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Admin token auth is not configured on the server",
+    })
+  }
+
+  if (!ctx.isAdminAuthed) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid or missing admin token",
+    })
+  }
+
+  return next()
+})
+export const workerProcedure = t.procedure.use(async ({ ctx, next }) => {
+  if (!ctx.clientIp) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Unable to determine caller IP",
+    })
+  }
+
+  const caller = await resolveWorkerByIp(ctx.clientIp)
+
+  if (!caller) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Caller is not a managed worker",
+    })
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      workerCaller: caller,
+    },
+  })
+})
+export const authedOrWorkerProcedure = t.procedure.use(async ({ ctx, next }) => {
+  if (ctx.isAdminAuthed) {
+    return next()
+  }
+
+  if (!ctx.clientIp) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Unable to determine caller IP",
+    })
+  }
+
+  const caller = await resolveWorkerByIp(ctx.clientIp)
+
+  if (!caller) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid or missing admin token",
+    })
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      workerCaller: caller,
+    },
+  })
+})
 
 const workerStatusSchema = z.enum([
   "ready",
@@ -84,6 +163,7 @@ const presetsSchema = z.array(
   z.object({
     name: z.string(),
     imageTag: z.string(),
+    privileged: z.boolean().optional(),
     requiredEnv: z.array(z.string()),
   }),
 )
@@ -98,8 +178,6 @@ const globalSettingsSchema = z.object({
       username: z.string(),
     }),
   ),
-  githubUsername: z.string(),
-  githubTokenConfigured: z.boolean(),
   sshPublicKeys: z.array(
     z.object({
       id: z.string(),
@@ -108,8 +186,6 @@ const globalSettingsSchema = z.object({
     }),
   ),
 })
-
-const workerOutputs = new Map<string, string>()
 
 export const appRouter = router({
   health: publicProcedure
@@ -123,31 +199,25 @@ export const appRouter = router({
         ok: true as const,
       }
     }),
-  presets: publicProcedure.output(presetsSchema).query(() => {
+  presets: authedProcedure.output(presetsSchema).query(() => {
     return config.presets
   }),
-  globalSettings: publicProcedure
+  globalSettings: authedProcedure
     .output(globalSettingsSchema)
     .query(() => {
       return getGlobalSettings()
     }),
-  saveGlobalSettings: publicProcedure
+  saveGlobalSettings: authedProcedure
     .input(
       z.object({
         autoPauseMinutes: z.number().int().positive().nullable().optional(),
-        githubUsername: z.string().trim().optional(),
-        githubToken: z.string().trim().min(1).optional(),
-        clearGithubToken: z.boolean().optional(),
       }),
     )
     .output(globalSettingsSchema)
     .mutation(async ({ input }) => {
-      clearWorkersCache()
-      const result = saveGlobalSettings(input)
-      await applyGithubAccountsToRunningWorkers()
-      return result
+      return saveGlobalSettings(input)
     }),
-  saveGithubAccount: publicProcedure
+  saveGithubAccount: authedProcedure
     .input(
       z.object({
         id: z.string().trim().optional(),
@@ -168,7 +238,7 @@ export const appRouter = router({
       await applyGithubAccountsToRunningWorkers()
       return result
     }),
-  saveSshPublicKey: publicProcedure
+  saveSshPublicKey: authedProcedure
     .input(
       z.object({
         id: z.string().trim().optional(),
@@ -181,7 +251,7 @@ export const appRouter = router({
       clearWorkersCache()
       return saveSshPublicKey(input)
     }),
-  deleteGithubAccount: publicProcedure
+  deleteGithubAccount: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -194,7 +264,7 @@ export const appRouter = router({
       await applyGithubAccountsToRunningWorkers()
       return result
     }),
-  deleteSshPublicKey: publicProcedure
+  deleteSshPublicKey: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -205,7 +275,7 @@ export const appRouter = router({
       clearWorkersCache()
       return deleteSshPublicKey(input.id)
     }),
-  setDefaultGithubAccount: publicProcedure
+  setDefaultGithubAccount: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -218,7 +288,7 @@ export const appRouter = router({
       await applyGithubAccountsToRunningWorkers()
       return result
     }),
-  setWorkerGithubAccount: publicProcedure
+  setWorkerGithubAccount: authedProcedure
     .input(
       z.object({
         accountId: z.string().optional(),
@@ -238,7 +308,7 @@ export const appRouter = router({
 
       return undefined
     }),
-  renameWorker: publicProcedure
+  renameWorker: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -261,10 +331,10 @@ export const appRouter = router({
         })
       }
     }),
-  workers: publicProcedure.output(workersSchema).query(async () => {
+  workers: authedProcedure.output(workersSchema).query(async () => {
     return listWorkers()
   }),
-  workerConnection: publicProcedure
+  workerConnection: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -343,7 +413,7 @@ export const appRouter = router({
         workspaceDir: available ? workspaceDir : null,
       }
     }),
-  stopWorker: publicProcedure
+  stopWorker: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -365,7 +435,7 @@ export const appRouter = router({
         })
       }
     }),
-  startExistingWorker: publicProcedure
+  startExistingWorker: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -392,7 +462,7 @@ export const appRouter = router({
         })
       }
     }),
-  replaceWorker: publicProcedure
+  replaceWorker: authedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -419,7 +489,7 @@ export const appRouter = router({
         })
       }
     }),
-  setWorkerSsh: publicProcedure
+  setWorkerSsh: authedProcedure
     .input(
       z.object({
         enabled: z.boolean(),
@@ -449,7 +519,7 @@ export const appRouter = router({
         })
       }
     }),
-  destroyWorker: publicProcedure
+  destroyWorker: authedOrWorkerProcedure
     .input(
       z.object({
         id: z.string().optional(),
@@ -458,26 +528,25 @@ export const appRouter = router({
     .output(z.void())
     .mutation(async ({ input, ctx }) => {
       try {
-        let targetId = input.id
+        if (
+          ctx.workerCaller &&
+          !ctx.isAdminAuthed &&
+          input.id &&
+          input.id !== ctx.workerCaller.id
+        ) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Workers may only destroy themselves",
+          })
+        }
+
+        const targetId = input.id ?? ctx.workerCaller?.id
 
         if (!targetId) {
-          if (!ctx.clientIp) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "No id provided and unable to determine caller IP",
-            })
-          }
-
-          const caller = await resolveWorkerByIp(ctx.clientIp)
-
-          if (!caller) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "No id provided and caller is not a managed worker",
-            })
-          }
-
-          targetId = caller.id
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No id provided and caller is not a managed worker",
+          })
         }
 
         await destroyWorkerContainer(targetId)
@@ -495,7 +564,7 @@ export const appRouter = router({
         })
       }
     }),
-  startWorker: publicProcedure
+  startWorker: authedProcedure
     .input(
       z.object({
         title: z.string(),
@@ -529,7 +598,7 @@ export const appRouter = router({
         })
       }
     }),
-  startSubWorker: publicProcedure
+  startSubWorker: workerProcedure
     .input(
       z.object({
         title: z.string(),
@@ -546,14 +615,7 @@ export const appRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        if (!ctx.clientIp) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Unable to determine caller IP",
-          })
-        }
-
-        const caller = await resolveWorkerByIp(ctx.clientIp)
+        const caller = ctx.workerCaller
 
         if (!caller) {
           throw new TRPCError({
@@ -600,7 +662,7 @@ export const appRouter = router({
         })
       }
     }),
-  setWorkerOutput: publicProcedure
+  setWorkerOutput: workerProcedure
     .input(
       z.object({
         output: z.string(),
@@ -608,26 +670,17 @@ export const appRouter = router({
     )
     .output(z.void())
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.clientIp) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Unable to determine caller IP",
-        })
-      }
-
-      const caller = await resolveWorkerByIp(ctx.clientIp)
-
-      if (!caller) {
+      if (!ctx.workerCaller) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Caller is not a managed worker",
         })
       }
 
-      workerOutputs.set(caller.id, input.output)
+      setWorkerOutput(ctx.workerCaller.id, input.output)
       return undefined
     }),
-  getWorkerOutput: publicProcedure
+  getWorkerOutput: authedOrWorkerProcedure
     .input(
       z.object({
         workerId: z.string(),
@@ -637,15 +690,18 @@ export const appRouter = router({
       z.object({
         status: workerStatusSchema.nullable(),
         output: z.string().nullable(),
+        truncated: z.boolean(),
       }),
     )
     .query(async ({ input }) => {
       const { workers } = await listWorkers()
       const worker = workers.find((w) => w.id === input.workerId)
+      const workerOutput = getWorkerOutput(input.workerId)
 
       return {
         status: worker?.status ?? null,
-        output: workerOutputs.get(input.workerId) ?? null,
+        output: workerOutput?.output ?? null,
+        truncated: workerOutput?.truncated ?? false,
       }
     }),
 })

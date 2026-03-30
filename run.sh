@@ -112,10 +112,10 @@ write_default_config() {
       "name": "default",
       "imageTag": "$worker_image_tag",
       "presetEnv": {
-        "GIT_AUTHOR_NAME": "Jiucheng's Agent Swarm",
-        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
-        "GIT_COMMITTER_NAME": "Jiucheng's Agent Swarm",
-        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com"
+        "GIT_AUTHOR_NAME": "Agent Swarm",
+        "GIT_AUTHOR_EMAIL": "agentswarm@local",
+        "GIT_COMMITTER_NAME": "Agent Swarm",
+        "GIT_COMMITTER_EMAIL": "agentswarm@local"
       },
       "requiredEnv": []
     },
@@ -123,10 +123,10 @@ write_default_config() {
       "name": "frontend",
       "imageTag": "$worker_image_tag",
       "presetEnv": {
-        "GIT_AUTHOR_NAME": "Jiucheng Frontend Swarm",
-        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
-        "GIT_COMMITTER_NAME": "Jiucheng Frontend Swarm",
-        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_AUTHOR_NAME": "Agent Swarm Frontend",
+        "GIT_AUTHOR_EMAIL": "frontend@agentswarm.local",
+        "GIT_COMMITTER_NAME": "Agent Swarm Frontend",
+        "GIT_COMMITTER_EMAIL": "frontend@agentswarm.local",
         "NODE_ENV": "development",
         "BROWSER": "none"
       },
@@ -136,10 +136,10 @@ write_default_config() {
       "name": "fullstack",
       "imageTag": "$worker_image_tag",
       "presetEnv": {
-        "GIT_AUTHOR_NAME": "Jiucheng Fullstack Swarm",
-        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
-        "GIT_COMMITTER_NAME": "Jiucheng Fullstack Swarm",
-        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_AUTHOR_NAME": "Agent Swarm Fullstack",
+        "GIT_AUTHOR_EMAIL": "fullstack@agentswarm.local",
+        "GIT_COMMITTER_NAME": "Agent Swarm Fullstack",
+        "GIT_COMMITTER_EMAIL": "fullstack@agentswarm.local",
         "NODE_ENV": "development"
       },
       "requiredEnv": []
@@ -148,10 +148,10 @@ write_default_config() {
       "name": "oss-contrib",
       "imageTag": "$worker_image_tag",
       "presetEnv": {
-        "GIT_AUTHOR_NAME": "Jiucheng OSS Swarm",
-        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
-        "GIT_COMMITTER_NAME": "Jiucheng OSS Swarm",
-        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_AUTHOR_NAME": "Agent Swarm OSS",
+        "GIT_AUTHOR_EMAIL": "oss@agentswarm.local",
+        "GIT_COMMITTER_NAME": "Agent Swarm OSS",
+        "GIT_COMMITTER_EMAIL": "oss@agentswarm.local",
         "GH_PROMPT_DISABLED": "1"
       },
       "requiredEnv": []
@@ -160,10 +160,10 @@ write_default_config() {
       "name": "ai-agent",
       "imageTag": "$worker_image_tag",
       "presetEnv": {
-        "GIT_AUTHOR_NAME": "Jiucheng AI Agent",
-        "GIT_AUTHOR_EMAIL": "git.jiucheng@gmail.com",
-        "GIT_COMMITTER_NAME": "Jiucheng AI Agent",
-        "GIT_COMMITTER_EMAIL": "git.jiucheng@gmail.com",
+        "GIT_AUTHOR_NAME": "Agent Swarm AI Agent",
+        "GIT_AUTHOR_EMAIL": "ai@agentswarm.local",
+        "GIT_COMMITTER_NAME": "Agent Swarm AI Agent",
+        "GIT_COMMITTER_EMAIL": "ai@agentswarm.local",
         "NODE_ENV": "development"
       },
       "requiredEnv": [

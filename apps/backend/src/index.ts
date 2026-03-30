@@ -1,11 +1,21 @@
 import { createBunServeHandler } from "trpc-bun-adapter"
 import { resolve } from "node:path"
-import { port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath } from "./config"
+import { port, host, isProduction, frontendDevServer, frontendDist, frontendIndexPath, adminToken } from "./config"
 import { appRouter, type TRPCContext } from "./router"
 import { initializeAutoPauseScheduler } from "./auto-pause"
 import { initializeWorkerContainerRuntime, selfIp } from "./worker-container"
 
 const requestIpMap = new WeakMap<Request, string>()
+
+function readAdminTokenFromRequest(request: Request) {
+  const authorization = request.headers.get("authorization")?.trim() ?? ""
+
+  if (authorization.toLowerCase().startsWith("bearer ")) {
+    return authorization.slice(7).trim()
+  }
+
+  return request.headers.get("x-agentswarm-token")?.trim() ?? ""
+}
 
 function isSpaNavigationRequest(request: Request) {
   if (request.method === "HEAD") {
@@ -86,6 +96,8 @@ const handler = createBunServeHandler(
     router: appRouter,
     createContext: ({ req }: { req: Request }): TRPCContext => ({
       clientIp: requestIpMap.get(req),
+      isAdminAuthed:
+        adminToken.length > 0 && readAdminTokenFromRequest(req) === adminToken,
     }),
   },
   {

@@ -1,6 +1,7 @@
 import { docker, findManagedContainerById, WORKER_WORKSPACE_VOLUME_LABEL } from "./worker-container"
 import { clearWorkersCache } from "./list-workers"
 import { clearStoredWorkerTitle, clearWorkerGithubAccount } from "./secrets"
+import { clearWorkerOutput } from "./worker-output-store"
 
 const WORKSPACE_ROOT = "/home/kasm-user/workers"
 
@@ -36,5 +37,6 @@ export async function destroyWorkerContainer(
 
   clearWorkerGithubAccount(id)
   clearStoredWorkerTitle(id)
+  clearWorkerOutput(id)
   clearWorkersCache()
 }

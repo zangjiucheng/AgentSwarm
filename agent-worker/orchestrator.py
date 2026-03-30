@@ -28,6 +28,7 @@ def trpc_query(base_url: str, procedure: str, input_data=None):
         url += "?" + urllib.parse.urlencode({"input": json.dumps(input_data)})
     req = urllib.request.Request(url, method="GET")
     req.add_header("Content-Type", "application/json")
+    maybe_add_admin_auth(req)
     return _do_request(req)
 
 
@@ -36,7 +37,17 @@ def trpc_mutation(base_url: str, procedure: str, input_data=None):
     body = json.dumps(input_data if input_data is not None else {}).encode()
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
+    maybe_add_admin_auth(req)
     return _do_request(req)
+
+
+def maybe_add_admin_auth(req: urllib.request.Request):
+    token = (
+        os.environ.get("AGENTSWARM_ADMIN_TOKEN", "").strip()
+        or os.environ.get("ORCHESTRATOR_ADMIN_TOKEN", "").strip()
+    )
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
 
 
 def _do_request(req: urllib.request.Request):

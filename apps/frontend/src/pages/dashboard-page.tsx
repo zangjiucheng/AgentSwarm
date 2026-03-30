@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router"
 import { WorkerSidebar } from "../components/worker-sidebar"
 import { WorkerWorkspace } from "../components/worker-workspace"
 import type { WorkerInfo } from "../lib/api-types"
-import { trpc } from "../trpc"
+import { clearAdminToken, trpc } from "../trpc"
 
 const EMPTY_WORKERS: WorkerInfo[] = []
 const EMPTY_HIERARCHY: Record<string, string[]> = {}
@@ -59,10 +59,12 @@ export function DashboardPage() {
     autoPauseMinutes: null,
     defaultGithubAccountId: null,
     githubAccounts: [],
-    githubUsername: "",
-    githubTokenConfigured: false,
     sshPublicKeys: [],
   }
+  const authError =
+    workersQuery.error ??
+    presetsQuery.error ??
+    globalSettingsQuery.error
 
   useEffect(() => {
     const prev = prevStatusById.current
@@ -96,6 +98,30 @@ export function DashboardPage() {
   const getWorkerState = (id: string): "active" | "cached" | "unloaded" => {
     if (id === activeId) return "active"
     return "unloaded"
+  }
+
+  if (
+    authError &&
+    authError.message.toLowerCase().includes("token")
+  ) {
+    return (
+      <div className="bg-background text-foreground flex min-h-screen items-center justify-center px-6">
+        <div className="w-full max-w-md rounded-2xl border border-danger/20 bg-danger/5 p-6">
+          <h1 className="text-xl font-semibold">Dashboard access denied</h1>
+          <p className="mt-2 text-sm text-white/70">{authError.message}</p>
+          <button
+            className="mt-5 rounded-lg bg-white/10 px-4 py-2 text-sm"
+            onClick={() => {
+              clearAdminToken()
+              window.location.reload()
+            }}
+            type="button"
+          >
+            Clear saved token
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const handleDestroyWorker = async (id: string) => {

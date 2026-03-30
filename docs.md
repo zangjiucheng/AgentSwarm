@@ -5,6 +5,7 @@
 ### Dashboard
 
 - Create, start, pause, migrate, and destroy workers from the web UI.
+- Require an admin token for dashboard TRPC access; only the `health` endpoint stays public.
 - Persist GitHub accounts and other backend-managed settings under `/app/data`.
 - Configure automatic worker pause after a chosen runtime threshold.
 
@@ -82,8 +83,11 @@ Required by default:
 
 Optional:
 
+- `AGENTSWARM_ADMIN_TOKEN`: required on the backend for dashboard API access
 - `OPENAI_API_KEY`: available inside workers for Codex and other OpenAI tooling
 - `GITHUB_TOKEN`: enables authenticated GitHub operations when provided directly
+
+For browser access, either bake `VITE_AGENTSWARM_ADMIN_TOKEN` into the frontend build or enter the admin token in the dashboard prompt.
 
 GitHub accounts configured from the dashboard are injected into newly created workers automatically.
 
@@ -114,6 +118,8 @@ The worker image is Debian-based:
 
 - runtime image definition: [`agent-worker/Dockerfile`](./agent-worker/Dockerfile)
 - worker entrypoint: [`agent-worker/docker-entrypoint.sh`](./agent-worker/docker-entrypoint.sh)
+
+Worker containers run without Docker privileged mode by default. If a preset truly needs privileged mode, it must opt in explicitly in backend config.
 
 ### Extra Computer-Use Setup Script
 

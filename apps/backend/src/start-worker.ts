@@ -264,7 +264,7 @@ export async function startWorkerContainer({
       ShmSize: SHARED_MEMORY_BYTES,
       Memory: MEMORY_LIMIT_BYTES,
       CpuShares: 128,
-      Privileged: true,
+      Privileged: selectedPreset.privileged === true,
     },
     Labels: {
       [WORKER_CREATED_WITH_VERSION_LABEL]: currentAgentSwarmVersion,

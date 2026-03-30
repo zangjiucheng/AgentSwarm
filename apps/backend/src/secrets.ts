@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { dirname, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
 import z from "zod"
 
 const GithubAccountSchema = z.object({
@@ -21,8 +20,6 @@ const SecretStoreSchema = z.object({
   autoPauseMinutes: z.number().int().nonnegative().nullable().default(null),
   defaultGithubAccountId: z.string().default(""),
   githubAccounts: z.array(GithubAccountSchema).default([]),
-  githubToken: z.string().default(""),
-  githubUsername: z.string().default(""),
   sshPublicKeys: z.array(SshPublicKeySchema).default([]),
   workerGithubAccountIds: z.record(z.string(), z.string()).default({}),
   workerTitles: z.record(z.string(), z.string()).default({}),
@@ -42,11 +39,9 @@ function readEnv(name: string, fallback?: string) {
   return process.env[name] ?? fallback
 }
 
-const currentDir = dirname(fileURLToPath(import.meta.url))
 const secretStorePath =
   readEnv("SECRET_STORE_PATH") ??
-  resolve(process.cwd(), "data/secrets.json") ??
-  resolve(currentDir, "../data/secrets.json")
+  resolve(process.cwd(), "data/secrets.json")
 
 let secretStore: SecretStore = loadSecretStore()
 
@@ -93,17 +88,6 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
       ? null
       : store.autoPauseMinutes
 
-  if (githubAccounts.length === 0 && store.githubToken.trim().length > 0) {
-    const legacyId = "legacy-default"
-    githubAccounts.push({
-      id: legacyId,
-      name: store.githubUsername.trim() || "Default GitHub account",
-      token: store.githubToken,
-      username: store.githubUsername.trim(),
-    })
-    seenIds.add(legacyId)
-  }
-
   const filteredWorkerGithubAccountIds = Object.fromEntries(
     Object.entries(store.workerGithubAccountIds).filter(([, accountId]) =>
       seenIds.has(accountId),
@@ -118,8 +102,6 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
     autoPauseMinutes,
     defaultGithubAccountId,
     githubAccounts,
-    githubToken: "",
-    githubUsername: "",
     sshPublicKeys: store.sshPublicKeys.map((key) => ({
       id: key.id,
       name: key.name.trim(),
@@ -135,17 +117,73 @@ function normalizeSecretStore(store: SecretStore): SecretStore {
   }
 }
 
+function migrateLegacySecretStore(rawStore: unknown) {
+  if (!rawStore || typeof rawStore !== "object" || Array.isArray(rawStore)) {
+    return {
+      store: rawStore,
+      migrated: false,
+    }
+  }
+
+  const record = { ...(rawStore as Record<string, unknown>) }
+  const githubAccounts = Array.isArray(record.githubAccounts)
+    ? record.githubAccounts
+    : []
+  const legacyToken =
+    typeof record.githubToken === "string" ? record.githubToken.trim() : ""
+  const legacyUsername =
+    typeof record.githubUsername === "string" ? record.githubUsername.trim() : ""
+
+  let migrated = false
+
+  if (githubAccounts.length === 0 && legacyToken) {
+    record.githubAccounts = [
+      {
+        id: "legacy-default",
+        name: legacyUsername || "Default GitHub account",
+        token: legacyToken,
+        username: legacyUsername,
+      },
+    ]
+    if (!record.defaultGithubAccountId) {
+      record.defaultGithubAccountId = "legacy-default"
+    }
+    migrated = true
+  }
+
+  if ("githubToken" in record) {
+    delete record.githubToken
+    migrated = true
+  }
+
+  if ("githubUsername" in record) {
+    delete record.githubUsername
+    migrated = true
+  }
+
+  return {
+    store: record,
+    migrated,
+  }
+}
+
 function loadSecretStore() {
   try {
     if (!existsSync(secretStorePath)) {
       return SecretStoreSchema.parse({})
     }
 
-    const parsed = SecretStoreSchema.parse(
-      JSON.parse(readFileSync(secretStorePath, "utf-8")),
-    )
+    const rawStore = JSON.parse(readFileSync(secretStorePath, "utf-8")) as unknown
+    const migrated = migrateLegacySecretStore(rawStore)
+    const parsed = SecretStoreSchema.parse(migrated.store)
+    const normalized = normalizeSecretStore(parsed)
 
-    return normalizeSecretStore(parsed)
+    if (migrated.migrated) {
+      mkdirSync(dirname(secretStorePath), { recursive: true })
+      writeFileSync(secretStorePath, `${JSON.stringify(normalized, null, 2)}\n`)
+    }
+
+    return normalized
   } catch (error) {
     console.warn("Failed to read secret store, using defaults:", error)
     return SecretStoreSchema.parse({})
@@ -210,8 +248,6 @@ export function getGlobalSettings() {
     autoPauseMinutes: secretStore.autoPauseMinutes,
     defaultGithubAccountId: defaultAccount?.id ?? null,
     githubAccounts: secretStore.githubAccounts.map(toPublicGithubAccount),
-    githubTokenConfigured: secretStore.githubAccounts.length > 0,
-    githubUsername: defaultAccount?.username ?? "",
     sshPublicKeys: secretStore.sshPublicKeys,
   }
 }
@@ -253,9 +289,6 @@ export function saveGithubAccount(input: {
 
 export function saveGlobalSettings(input: {
   autoPauseMinutes?: number | null
-  githubUsername?: string
-  githubToken?: string
-  clearGithubToken?: boolean
 }) {
   const nextSecretStore = normalizeSecretStore({
     ...secretStore,
@@ -263,38 +296,6 @@ export function saveGlobalSettings(input: {
       input.autoPauseMinutes === undefined ? secretStore.autoPauseMinutes : input.autoPauseMinutes,
   })
   persistSecretStore(nextSecretStore)
-
-  const defaultAccount = getDefaultGithubAccount()
-  const githubUsername = input.githubUsername?.trim() ?? ""
-
-  if (input.clearGithubToken) {
-    if (defaultAccount) {
-      return deleteGithubAccount(defaultAccount.id)
-    }
-
-    return getGlobalSettings()
-  }
-
-  if (input.githubToken?.trim()) {
-    return saveGithubAccount({
-      id: defaultAccount?.id,
-      name:
-        defaultAccount?.name ||
-        githubUsername ||
-        "Default GitHub account",
-      token: input.githubToken,
-      username: githubUsername,
-    })
-  }
-
-  if (defaultAccount && githubUsername) {
-    return saveGithubAccount({
-      id: defaultAccount.id,
-      name: defaultAccount.name,
-      token: defaultAccount.token,
-      username: githubUsername,
-    })
-  }
 
   return getGlobalSettings()
 }

@@ -19,6 +19,7 @@ import {
   transferWorkerTitle,
   transferWorkerGithubAccount,
 } from "./secrets"
+import { clearWorkerOutput } from "./worker-output-store"
 
 const HEALTH_POLL_INTERVAL_MS = 1_000
 const HEALTH_TIMEOUT_MS = 60_000
@@ -223,6 +224,7 @@ export async function replaceManagedWorkerContainer(
 
     transferWorkerGithubAccount(id, replacement.id)
     transferWorkerTitle(id, replacement.id)
+    clearWorkerOutput(id)
     await destroyWorkerContainer(id, { removeWorkspaceVolume: false })
 
     clearWorkersCache()

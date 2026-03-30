@@ -15,6 +15,7 @@ import {
 } from "./worker-container"
 import { getEffectiveGithubAccountForWorker, getStoredWorkerTitle } from "./secrets"
 import { readComputerUseState, type ComputerUseStatus } from "./computer-use"
+import { pruneWorkerOutputs } from "./worker-output-store"
 
 const WORKERS_CACHE_TTL_MS = 900
 
@@ -201,6 +202,7 @@ async function loadWorkers(): Promise<WorkersResult> {
   allWorkers.sort((a, b) => b.info.createdAt - a.info.createdAt)
 
   const workers: WorkerInfo[] = allWorkers.map((w) => w.info)
+  pruneWorkerOutputs(workers.map((worker) => worker.id))
 
   // Build hierarchy: parentId -> [childId, ...]
   const hierarchy: Record<string, string[]> = {}

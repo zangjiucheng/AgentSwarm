@@ -17,6 +17,8 @@ curl -fsSL https://raw.githubusercontent.com/zangjiucheng/AgentSwarm/refs/heads/
 
 Open `http://localhost:14000` after startup.
 
+Set `AGENTSWARM_ADMIN_TOKEN` on the backend and `VITE_AGENTSWARM_ADMIN_TOKEN` in the frontend build, or enter the admin token in the dashboard when prompted.
+
 ### Uninstall
 
 This removes the local AgentSwarm container, generated config, and related images handled by `wrapup.sh`.
@@ -102,6 +104,8 @@ The runtime image already includes a default config, so mounting `apps/backend/c
 - Worker SSH access for VS Code Remote-SSH
 - Persistent workspace volumes with pause/start and migrate support
 - Dashboard-managed GitHub accounts and worker auto-pause settings
+- Dashboard API protected by a shared admin token; worker callbacks stay worker-authenticated
+- Worker containers run without Docker privileged mode by default
 
 ## Documentation
 

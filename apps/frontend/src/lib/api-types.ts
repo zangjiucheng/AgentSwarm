@@ -17,14 +17,13 @@ export type GlobalSettings = {
   autoPauseMinutes: number | null
   defaultGithubAccountId: string | null
   githubAccounts: GithubAccount[]
-  githubUsername: string
-  githubTokenConfigured: boolean
   sshPublicKeys: SshPublicKey[]
 }
 
 export type PresetInfo = {
   imageTag: string
   name: string
+  privileged?: boolean
   requiredEnv: string[]
 }
 

@@ -8,6 +8,7 @@ const PresetSchema = z.object({
   imageTag: z.string(),
   presetEnv: z.record(z.string(), z.string()),
   requiredEnv: z.array(z.string()),
+  privileged: z.boolean().optional(),
 })
 
 const ConfigSchema = z
@@ -139,6 +140,7 @@ const frontendDevServer = readEnv(
 const frontendDist =
   readEnv("FRONTEND_DIST") ?? resolve(currentDir, "../../frontend/dist")
 const frontendIndexPath = resolve(frontendDist, "index.html")
+const adminToken = readEnv("AGENTSWARM_ADMIN_TOKEN", "").trim()
 
 export {
   config,
@@ -148,4 +150,5 @@ export {
   frontendDevServer,
   frontendDist,
   frontendIndexPath,
+  adminToken,
 }
