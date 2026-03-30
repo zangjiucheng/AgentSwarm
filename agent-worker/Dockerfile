@@ -30,6 +30,14 @@ RUN case "$TARGETARCH" in \
       "@openai/codex@${CODEX_VERSION}" \
       "$CODEX_PLATFORM_ALIAS"
 
+FROM node:22-bookworm-slim AS mcp-sdk-installer
+
+WORKDIR /opt/agentswarm-mcp
+
+COPY agent-worker/mcp/package.json /opt/agentswarm-mcp/package.json
+
+RUN npm install --omit=dev
+
 FROM node:22-bookworm-slim
 
 ARG CODEX_VERSION
@@ -46,6 +54,7 @@ ENV CODEX_VERSION=$CODEX_VERSION
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       bash \
+      bubblewrap \
       ca-certificates \
       chromium \
       curl \
@@ -122,6 +131,7 @@ COPY --from=monitor-builder /usr/local/bin/bunx /usr/local/bin/bunx
 COPY --from=monitor-builder /app/apps/monitor/dist/index.js /usr/local/bin/monitor.js
 COPY --from=monitor-builder /app/apps/monitor/dist/native /usr/local/lib/bun-pty
 COPY --from=codex-installer /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=mcp-sdk-installer /opt/agentswarm-mcp/node_modules /home/kasm-user/.codex/mcp/node_modules
 
 COPY --chown=1000:1000 agent-worker/dot_codex /home/kasm-user/.codex
 COPY --chown=1000:1000 agent-worker/mcp /home/kasm-user/.codex/mcp

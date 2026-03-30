@@ -62,7 +62,7 @@ const tools = [
   },
 ];
 
-startMcpServer({
+await startMcpServer({
   name: "desktop-files",
   enabled: COMPUTER_USE_ENABLED,
   tools,

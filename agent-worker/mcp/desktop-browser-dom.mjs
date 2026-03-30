@@ -171,7 +171,7 @@ const tools = [
   },
 ];
 
-startMcpServer({
+await startMcpServer({
   name: "desktop-browser-dom",
   enabled: COMPUTER_USE_ENABLED,
   tools,

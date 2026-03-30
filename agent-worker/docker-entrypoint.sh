@@ -178,9 +178,44 @@ configure_codex_mcp() {
 
   temp_file="$(mktemp)"
   awk -v start="$marker_start" -v end="$marker_end" '
-    $0 == start { skip = 1; next }
-    $0 == end { skip = 0; next }
-    skip != 1 { print }
+    BEGIN {
+      skip_marked = 0
+      skip_table = 0
+    }
+
+    $0 == start {
+      skip_marked = 1
+      next
+    }
+
+    $0 == end {
+      skip_marked = 0
+      next
+    }
+
+    skip_marked == 1 {
+      next
+    }
+
+    /^\[mcp_servers\.desktop-(vision|input|browser-ui|browser-dom|files)\]$/ {
+      skip_table = 1
+      next
+    }
+
+    /^\[mcp_servers\.desktop-(vision|input|browser-ui|browser-dom|files)\.env\]$/ {
+      skip_table = 1
+      next
+    }
+
+    skip_table == 1 {
+      if ($0 ~ /^\[/) {
+        skip_table = 0
+        print
+      }
+      next
+    }
+
+    { print }
   ' "$config_file" >"$temp_file"
   mv "$temp_file" "$config_file"
 

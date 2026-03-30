@@ -54,7 +54,7 @@ const tools = [
   },
 ];
 
-startMcpServer({
+await startMcpServer({
   name: "desktop-vision",
   enabled: COMPUTER_USE_ENABLED,
   tools,

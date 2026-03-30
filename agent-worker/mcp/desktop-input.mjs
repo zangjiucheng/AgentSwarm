@@ -194,7 +194,7 @@ const tools = [
   },
 ];
 
-startMcpServer({
+await startMcpServer({
   name: "desktop-input",
   enabled: COMPUTER_USE_ENABLED,
   tools,
