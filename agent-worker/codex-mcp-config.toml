@@ -1,0 +1,49 @@
+[mcp_servers.desktop-vision]
+command = "/usr/local/bin/node"
+args = ["/home/kasm-user/.codex/mcp/desktop-vision.mjs"]
+startup_timeout_sec = 30
+
+[mcp_servers.desktop-vision.env]
+WORKER_COMPUTER_USE_ENABLED = "1"
+DISPLAY = ":1"
+WORKER_CHROMIUM_DEBUG_PORT = "9222"
+
+[mcp_servers.desktop-input]
+command = "/usr/local/bin/node"
+args = ["/home/kasm-user/.codex/mcp/desktop-input.mjs"]
+startup_timeout_sec = 30
+
+[mcp_servers.desktop-input.env]
+WORKER_COMPUTER_USE_ENABLED = "1"
+DISPLAY = ":1"
+WORKER_CHROMIUM_DEBUG_PORT = "9222"
+
+[mcp_servers.desktop-browser-ui]
+command = "/usr/local/bin/node"
+args = ["/home/kasm-user/.codex/mcp/desktop-browser-ui.mjs"]
+startup_timeout_sec = 30
+
+[mcp_servers.desktop-browser-ui.env]
+WORKER_COMPUTER_USE_ENABLED = "1"
+DISPLAY = ":1"
+WORKER_CHROMIUM_DEBUG_PORT = "9222"
+
+[mcp_servers.desktop-browser-dom]
+command = "/usr/local/bin/node"
+args = ["/home/kasm-user/.codex/mcp/desktop-browser-dom.mjs"]
+startup_timeout_sec = 30
+
+[mcp_servers.desktop-browser-dom.env]
+WORKER_COMPUTER_USE_ENABLED = "1"
+DISPLAY = ":1"
+WORKER_CHROMIUM_DEBUG_PORT = "9222"
+
+[mcp_servers.desktop-files]
+command = "/usr/local/bin/node"
+args = ["/home/kasm-user/.codex/mcp/desktop-files.mjs"]
+startup_timeout_sec = 30
+
+[mcp_servers.desktop-files.env]
+WORKER_COMPUTER_USE_ENABLED = "1"
+DISPLAY = ":1"
+WORKER_CHROMIUM_DEBUG_PORT = "9222"

@@ -17,6 +17,7 @@ VNC_PORT="${WORKER_VNC_PORT:-6901}"
 VNC_PASSWORD="${WORKER_VNC_PASSWORD:-computer-use}"
 VNC_SCREEN="${WORKER_VNC_RESOLUTION:-1440x900x24}"
 X11VNC_PORT="${WORKER_X11VNC_PORT:-5900}"
+CHROMIUM_DEBUG_PORT="${WORKER_CHROMIUM_DEBUG_PORT:-9222}"
 EXTRA_COMPUTER_USE_SETUP_SCRIPT="${WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT:-}"
 
 mkdir -p "$COMPUTER_USE_STATE_DIR"
@@ -246,8 +247,21 @@ launch_terminal() {
 
 launch_browser() {
   run_as_worker_background "
+    mkdir -p '$WORKER_HOME_DIR/.config/chromium-agentswarm'
+    rm -f \
+      '$WORKER_HOME_DIR/.config/chromium-agentswarm/SingletonLock' \
+      '$WORKER_HOME_DIR/.config/chromium-agentswarm/SingletonSocket' \
+      '$WORKER_HOME_DIR/.config/chromium-agentswarm/SingletonCookie'
+
     if command -v chromium >/dev/null 2>&1; then
-      exec chromium --no-sandbox --disable-dev-shm-usage about:blank
+      exec chromium \
+        --no-sandbox \
+        --disable-dev-shm-usage \
+        --new-window \
+        --remote-debugging-address=127.0.0.1 \
+        --remote-debugging-port='$CHROMIUM_DEBUG_PORT' \
+        --user-data-dir='$WORKER_HOME_DIR/.config/chromium-agentswarm' \
+        about:blank
     fi
 
     if command -v firefox-esr >/dev/null 2>&1; then

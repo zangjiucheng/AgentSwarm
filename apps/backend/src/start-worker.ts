@@ -210,6 +210,7 @@ export async function startWorkerContainer({
     ? {
         DISPLAY: ":1",
         WORKER_COMPUTER_USE_ENABLED: "1",
+        WORKER_CHROMIUM_DEBUG_PORT: "9222",
         ...(resolvedComputerUseExtraSetupScript
           ? {
               WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT:

@@ -111,6 +111,7 @@ Detailed usage and runtime documentation lives in [docs.md](./docs.md), includin
 - settings, secrets, and environment variables
 - repository clone behavior
 - presets and worker image details
+- computer-use skill guidance for desktop workflows
 - operational notes and persistence behavior
 
 ## Credits

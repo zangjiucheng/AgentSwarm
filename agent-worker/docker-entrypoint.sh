@@ -13,6 +13,7 @@ WORKER_SSH_AUTHORIZED_KEYS="${WORKER_SSH_AUTHORIZED_KEYS:-${WORKER_SSH_AUTHORIZE
 WORKER_SSH_PASSWORD="${WORKER_SSH_PASSWORD:-}"
 WORKER_COMPUTER_USE_ENABLED="${WORKER_COMPUTER_USE_ENABLED:-0}"
 WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT="${WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT:-}"
+WORKER_CHROMIUM_DEBUG_PORT="${WORKER_CHROMIUM_DEBUG_PORT:-9222}"
 WORKER_VNC_PASSWORD="${WORKER_VNC_PASSWORD:-}"
 WORKER_VNC_PORT="${WORKER_VNC_PORT:-6901}"
 WORKER_VNC_RESOLUTION="${WORKER_VNC_RESOLUTION:-1440x900x24}"
@@ -24,6 +25,7 @@ SSHD_BIN="$(command -v sshd)"
 SSH_KEYGEN_BIN="$(command -v ssh-keygen)"
 MONITOR_SCRIPT="/usr/local/bin/monitor.js"
 COMPUTER_USE_SCRIPT="/usr/local/bin/computer-use-start"
+CODEX_MCP_CONFIG_FRAGMENT="/usr/local/share/agentswarm/codex-mcp-config.toml"
 BUN_PTY_LIB=""
 DOCKERD_PID=""
 SSHD_PID=""
@@ -165,6 +167,69 @@ setup_vscode_remote_ssh_compat() {
   chown -R 1000:1000 "$vscode_env_dir"
 }
 
+configure_codex_mcp() {
+  local config_file="$HOME_DIR/.codex/config.toml"
+  local marker_start="# agentswarm-computer-use-mcp:start"
+  local marker_end="# agentswarm-computer-use-mcp:end"
+  local temp_file=""
+
+  mkdir -p "$HOME_DIR/.codex"
+  touch "$config_file"
+
+  temp_file="$(mktemp)"
+  awk -v start="$marker_start" -v end="$marker_end" '
+    BEGIN {
+      skip_marked = 0
+      skip_table = 0
+    }
+
+    $0 == start {
+      skip_marked = 1
+      next
+    }
+
+    $0 == end {
+      skip_marked = 0
+      next
+    }
+
+    skip_marked == 1 {
+      next
+    }
+
+    /^\[mcp_servers\.desktop-(vision|input|browser-ui|browser-dom|files)\]$/ {
+      skip_table = 1
+      next
+    }
+
+    /^\[mcp_servers\.desktop-(vision|input|browser-ui|browser-dom|files)\.env\]$/ {
+      skip_table = 1
+      next
+    }
+
+    skip_table == 1 {
+      if ($0 ~ /^\[/) {
+        skip_table = 0
+        print
+      }
+      next
+    }
+
+    { print }
+  ' "$config_file" >"$temp_file"
+  mv "$temp_file" "$config_file"
+
+  if [ "$WORKER_COMPUTER_USE_ENABLED" = "1" ] && [ -f "$CODEX_MCP_CONFIG_FRAGMENT" ]; then
+    {
+      printf '\n%s\n' "$marker_start"
+      cat "$CODEX_MCP_CONFIG_FRAGMENT"
+      printf '%s\n' "$marker_end"
+    } >>"$config_file"
+  fi
+
+  chown 1000:1000 "$config_file"
+}
+
 setup_sshd() {
   local sftp_server_bin="/usr/lib/openssh/sftp-server"
 
@@ -248,6 +313,7 @@ trap cleanup EXIT INT TERM
 
 start_dockerd_if_needed
 setup_vscode_remote_ssh_compat
+configure_codex_mcp
 setup_sshd
 
 if [ -f "$HOME_DIR/.agentswarm-shell-env" ]; then
@@ -267,6 +333,7 @@ exec "$SETPRIV_BIN" \
   MONITOR_PORT="$MONITOR_PORT" \
   WORKER_COMPUTER_USE_ENABLED="$WORKER_COMPUTER_USE_ENABLED" \
   WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT="$WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT" \
+  WORKER_CHROMIUM_DEBUG_PORT="$WORKER_CHROMIUM_DEBUG_PORT" \
   WORKER_VNC_PASSWORD="$WORKER_VNC_PASSWORD" \
   WORKER_VNC_PORT="$WORKER_VNC_PORT" \
   WORKER_VNC_RESOLUTION="$WORKER_VNC_RESOLUTION" \
@@ -449,6 +516,7 @@ EOF
         WORKSPACE_DIR="$WORKSPACE_DIR" \
         WORKER_COMPUTER_USE_ENABLED="$WORKER_COMPUTER_USE_ENABLED" \
         WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT="$WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT" \
+        WORKER_CHROMIUM_DEBUG_PORT="$WORKER_CHROMIUM_DEBUG_PORT" \
         WORKER_VNC_PASSWORD="$WORKER_VNC_PASSWORD" \
         WORKER_VNC_PORT="$WORKER_VNC_PORT" \
         WORKER_VNC_RESOLUTION="$WORKER_VNC_RESOLUTION" \

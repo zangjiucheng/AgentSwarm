@@ -16,10 +16,27 @@ Included by default:
 - VS Code Vim extension (`vscodevim.vim`)
 - OpenAI Codex CLI
 - `configure-github.sh` helper at `~/configure-github.sh` and `configure-github`
-- Bundled Codex skills: `repo-survey`, `terminal-pty`, `worker-runtime`, `github-auth`, `frontend-regression`
+- Bundled Codex skills: `computer-use-practice`, `repo-survey`, `terminal-pty`, `worker-runtime`, `github-auth`, `frontend-regression`
 - Docker in Docker
 - Git, GitHub CLI, tmux, ripgrep, Python 3
 - Optional XFCE/noVNC desktop stack for computer-use workers
+- Worker-local MCP servers for computer-use mode: `desktop-vision`, `desktop-input`, `desktop-browser-ui`, `desktop-browser-dom`, `desktop-files`
+
+For desktop-operation guidance inside computer-use workers, start with:
+
+- [`dot_agent/skills/computer-use-practice/SKILL.md`](./dot_agent/skills/computer-use-practice/SKILL.md)
+
+Section entry points:
+
+- [`vision/index.md`](./dot_agent/skills/computer-use-practice/sections/vision/index.md)
+- [`cursor/index.md`](./dot_agent/skills/computer-use-practice/sections/cursor/index.md)
+- [`browser/index.md`](./dot_agent/skills/computer-use-practice/sections/browser/index.md)
+- [`forms/index.md`](./dot_agent/skills/computer-use-practice/sections/forms/index.md)
+- [`keyboard/index.md`](./dot_agent/skills/computer-use-practice/sections/keyboard/index.md)
+- [`scroll/index.md`](./dot_agent/skills/computer-use-practice/sections/scroll/index.md)
+- [`files/index.md`](./dot_agent/skills/computer-use-practice/sections/files/index.md)
+- [`workspace/index.md`](./dot_agent/skills/computer-use-practice/sections/workspace/index.md)
+- [`recovery/index.md`](./dot_agent/skills/computer-use-practice/sections/recovery/index.md)
 
 This image is intended to be a starting point. Build your own image on top of it if you need additional SDKs, project dependencies, or workspace bootstrap logic.
 
@@ -53,6 +70,7 @@ GitHub accounts are managed by the AgentSwarm backend secret store, not baked in
 | `CODE_SERVER_PORT` | Optional override for the code-server listen port |
 | `WORKER_COMPUTER_USE_ENABLED` | Enable desktop/VNC startup for computer-use mode |
 | `WORKER_COMPUTER_USE_EXTRA_SETUP_SCRIPT` | Optional extra setup script path or URL for computer-use startup |
+| `WORKER_CHROMIUM_DEBUG_PORT` | Local Chromium remote-debugging port used by DOM-aware browser MCP tools |
 | `WORKER_VNC_PASSWORD` | Optional VNC password override for computer-use mode |
 
 ## Ports

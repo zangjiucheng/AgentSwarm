@@ -32,6 +32,24 @@ The dashboard embeds each worker's `code-server` instance directly.
 
 Computer-use workers keep `code-server` in the main pane and expose desktop access through `Open desktop` once provisioning finishes.
 
+When a task actually requires GUI operation, use the bundled computer-use skill as the default playbook:
+
+- skill entry: [`agent-worker/dot_agent/skills/computer-use-practice/SKILL.md`](./agent-worker/dot_agent/skills/computer-use-practice/SKILL.md)
+- vision rules: [`agent-worker/dot_agent/skills/computer-use-practice/sections/vision/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/vision/index.md)
+- cursor rules: [`agent-worker/dot_agent/skills/computer-use-practice/sections/cursor/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/cursor/index.md)
+- browser rules: [`agent-worker/dot_agent/skills/computer-use-practice/sections/browser/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/browser/index.md)
+- forms rules: [`agent-worker/dot_agent/skills/computer-use-practice/sections/forms/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/forms/index.md)
+- files rules: [`agent-worker/dot_agent/skills/computer-use-practice/sections/files/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/files/index.md)
+- workspace and recovery rules: [`agent-worker/dot_agent/skills/computer-use-practice/sections/workspace/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/workspace/index.md) and [`agent-worker/dot_agent/skills/computer-use-practice/sections/recovery/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/recovery/index.md)
+
+Computer-use workers also register worker-local MCP servers for:
+
+- `desktop-vision`
+- `desktop-input`
+- `desktop-browser-ui`
+- `desktop-browser-dom`
+- `desktop-files`
+
 ### VS Code Remote-SSH
 
 Each new worker publishes an SSH endpoint. In the worker view, AgentSwarm shows:
@@ -105,6 +123,24 @@ If you do not want to maintain your own setup script yet, use the sample in this
 
 - example value: `./examples/computer-use-extra/setup.sh`
 - sample files: [`examples/computer-use-extra/setup.sh`](./examples/computer-use-extra/setup.sh) and [`examples/computer-use-extra/README.md`](./examples/computer-use-extra/README.md)
+
+### Bundled Computer-Use Skill
+
+Workers also ship with a bundled desktop-operation skill so the agent has a default ruleset for browser/VNC interaction:
+
+- [`agent-worker/dot_agent/skills/computer-use-practice/SKILL.md`](./agent-worker/dot_agent/skills/computer-use-practice/SKILL.md)
+
+The skill is intentionally split into a few section indexes rather than many tiny files:
+
+- [`vision/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/vision/index.md)
+- [`cursor/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/cursor/index.md)
+- [`browser/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/browser/index.md)
+- [`forms/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/forms/index.md)
+- [`keyboard/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/keyboard/index.md)
+- [`scroll/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/scroll/index.md)
+- [`files/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/files/index.md)
+- [`workspace/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/workspace/index.md)
+- [`recovery/index.md`](./agent-worker/dot_agent/skills/computer-use-practice/sections/recovery/index.md)
 
 ## Notes
 
