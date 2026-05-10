@@ -1,3 +1,5 @@
+> **Deprecated:** AgentSwarm is deprecated in favor of internal tooling and is no longer actively maintained for general use.
+
 # AgentSwarm
 
 [![Docker](https://github.com/zangjiucheng/AgentSwarm/actions/workflows/docker.yml/badge.svg)](https://github.com/zangjiucheng/AgentSwarm/actions/workflows/docker.yml)
